@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider, useLocation } from 'react-router-dom';
 import { AppStateProvider } from './context/AppStateContext';
 import { ToastContainer } from './components/ToastContainer';
 import { LandingPage } from './pages/LandingPage';
@@ -16,6 +16,12 @@ import { IssuesPage } from './pages/IssuesPage';
 import { RecordsPage } from './pages/RecordsPage';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { PlansPage } from './pages/PlansPage';
+
+function InspectionRoute() {
+  const location=useLocation();
+  return <InspectionFormPage key={location.pathname+location.search} />;
+}
 
 const router = createBrowserRouter([
   { path: '/', element: <LandingPage /> },
@@ -23,11 +29,12 @@ const router = createBrowserRouter([
   { path: '/app/assets', element: <AssetsPage /> },
   { path: '/app/assets/:id', element: <AssetDetailPage /> },
   { path: '/app/issues', element: <IssuesPage /> },
+  { path: '/app/plans', element: <PlansPage /> },
   { path: '/app/records', element: <RecordsPage /> },
   { path: '/app/templates', element: <TemplatesPage /> },
   { path: '/app/settings', element: <SettingsPage /> },
   { path: '/a/:id', element: <MobileScanPage /> },
-  { path: '/a/:id/inspect', element: <InspectionFormPage /> },
+  { path: '/a/:id/inspect', element: <InspectionRoute /> },
   { path: '*', element: <Navigate to="/" replace /> },
 ]);
 

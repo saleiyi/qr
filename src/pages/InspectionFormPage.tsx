@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useBeforeUnload, useBlocker, useNavigate, useParams } from 'react-router-dom';
+import { Link, useBeforeUnload, useBlocker, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowLeft,
@@ -29,10 +29,13 @@ import {
 } from '../utils/domainLogic';
 import { formatDateTimeBR } from '../utils/date';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ChecklistFields } from '../components/ChecklistFields';
+import { effectiveAnswer, visibleItems } from '../utils/checklist';
 
 function fingerprintDraft(draft: Omit<InspectionDraft, 'updatedAt'>): string {
   return JSON.stringify({
     assetId: draft.assetId,
+    taskId: draft.taskId,
     templateId: draft.templateId,
     inspectorId: draft.inspectorId,
     generalNotes: draft.generalNotes,
@@ -44,16 +47,19 @@ export const InspectionFormPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { state, demoSettings, submitInspection, addToast } = useAppState();
+  const [searchParams]=useSearchParams();
+  const taskId=searchParams.get('taskId') ?? undefined;
+  const task=state.tasks.find(t=>t.id === taskId && t.assetId === id);
 
   const asset = state.assets.find((a) => a.id === id);
   const template = asset
-    ? state.templates.find((t) => t.id === asset.templateId) ?? state.templates[0]
+    ? state.templates.find((t) => t.id === (task?.templateId ?? asset.templateId)) ?? state.templates[0]
     : undefined;
 
   const activeInspectors = state.members.filter(
     (m) => m.status === 'active' && m.role !== 'viewer',
   );
-  const defaultInspectorId = activeInspectors[0]?.id ?? state.members[0]?.id ?? '';
+  const defaultInspectorId = task?.assigneeId ?? activeInspectors[0]?.id ?? state.members[0]?.id ?? '';
 
   const [inspectorId, setInspectorId] = useState(defaultInspectorId);
   const [generalNotes, setGeneralNotes] = useState('');
@@ -81,19 +87,21 @@ export const InspectionFormPage: React.FC = () => {
 
   const draftValues = useMemo(() => ({
     assetId: asset?.id ?? '',
+    taskId,
     templateId: template?.id ?? '',
     inspectorId,
     generalNotes,
     answers,
-  }), [asset?.id, template?.id, inspectorId, generalNotes, answers]);
+  }), [asset?.id, taskId, template?.id, inspectorId, generalNotes, answers]);
   const currentFingerprint = useMemo(() => fingerprintDraft(draftValues), [draftValues]);
   const initialFingerprint = useMemo(() => fingerprintDraft({
     assetId: asset?.id ?? '',
+    taskId,
     templateId: template?.id ?? '',
     inspectorId: defaultInspectorId,
     generalNotes: '',
     answers: {},
-  }), [asset?.id, template?.id, defaultInspectorId]);
+  }), [asset?.id, taskId, template?.id, defaultInspectorId]);
   const hasPendingPhotos = pendingPhotoCount > 0;
   const hasUnsavedChanges = Boolean(
     asset && template && !submittedResult &&
@@ -103,7 +111,7 @@ export const InspectionFormPage: React.FC = () => {
   const blocker = useBlocker(useCallback(
     ({ currentLocation, nextLocation }) =>
       hasUnsavedChanges && !allowLeaveRef.current &&
-      currentLocation.pathname !== nextLocation.pathname,
+      currentLocation.pathname+currentLocation.search !== nextLocation.pathname+nextLocation.search,
     [hasUnsavedChanges],
   ));
 
@@ -121,7 +129,7 @@ export const InspectionFormPage: React.FC = () => {
   // Restore saved draft if present (and never preselect "Conforme")
   useEffect(() => {
     if (!asset) return;
-    const saved = loadInspectionDraft(asset.id);
+    const saved = loadInspectionDraft(asset.id,taskId);
     if (saved) {
       setAnswers(saved.answers ?? {});
       setGeneralNotes(saved.generalNotes ?? '');
@@ -132,7 +140,7 @@ export const InspectionFormPage: React.FC = () => {
         `Rascunho recuperado (salvo em ${formatDateTimeBR(saved.updatedAt)}).`,
       );
     }
-  }, [asset?.id]);
+  }, [asset?.id,taskId]);
 
   const persistDraft = useCallback(() => {
     const result = saveInspectionDraft(
@@ -164,18 +172,7 @@ export const InspectionFormPage: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [hasUnsavedChanges, hasPendingPhotos, lastSavedFingerprint, persistDraft]);
 
-  const sections = useMemo(() => {
-    if (!template) return [];
-    const grouped = new Map<string, TemplateItem[]>();
-    for (const item of template.items) {
-      const list = grouped.get(item.section) ?? [];
-      list.push(item);
-      grouped.set(item.section, list);
-    }
-    return Array.from(grouped.entries());
-  }, [template]);
-
-  if (!asset || !template) {
+  if (!asset || !template || (taskId && !task)) {
     return (
       <div className="min-h-screen bg-[#F4F7FA] p-6 text-center">
         <div className="mx-auto max-w-md rounded-2xl border border-[#DCE4EC] bg-white p-6">
@@ -193,9 +190,22 @@ export const InspectionFormPage: React.FC = () => {
     );
   }
 
-  const totalItems = template.items.length;
-  const answeredCount = template.items.filter(
-    (item) => Boolean(answers[item.id]?.status),
+  if (task?.status === 'completed' && !submittedResult) return (
+    <main className="flex min-h-screen items-center justify-center bg-[#F4F7FA] p-5">
+      <section className="w-full max-w-md rounded-2xl border border-[#DCE4EC] bg-white p-6 text-center">
+        <CheckCircle2 className="mx-auto h-10 w-10 text-[#176B5B]" />
+        <h1 className="mt-4 text-xl font-bold">Tarefa já concluída</h1>
+        <p className="mt-2 text-sm text-[#526980]">Esta execução já possui um registro. Você pode consultar o resultado ou voltar à agenda.</p>
+        <Link to={`/app/records?recordId=${task.recordId}`} className="mt-5 block rounded-lg bg-[#176B5B] px-4 py-3 font-semibold text-white">Ver registro</Link>
+        <Link to="/app/plans" className="mt-3 block p-2 text-sm font-semibold text-[#176B5B]">Voltar à agenda</Link>
+      </section>
+    </main>
+  );
+
+  const visible = visibleItems(template, answers);
+  const totalItems = visible.length;
+  const answeredCount = visible.filter(
+    (item) => Boolean(effectiveAnswer(item, answers[item.id]).status),
   ).length;
   const remainingCount = totalItems - answeredCount;
   const progressPct =
@@ -287,9 +297,9 @@ export const InspectionFormPage: React.FC = () => {
 
   const handleDiscardDraft = () => {
     allowLeaveRef.current = true;
-    clearInspectionDraft(asset.id);
+    clearInspectionDraft(asset.id,taskId);
     setConfirmDiscardOpen(false);
-    navigate(`/a/${asset.id}`);
+    navigate(taskId?'/app/plans':`/a/${asset.id}`);
   };
 
   const handleSubmitInspection = (e: React.FormEvent) => {
@@ -323,6 +333,7 @@ export const InspectionFormPage: React.FC = () => {
       generalNotes,
       answers,
       idempotencyKey: idempotencyKeyRef.current,
+      taskId,
     });
     setIsSubmitting(false);
 
@@ -335,7 +346,7 @@ export const InspectionFormPage: React.FC = () => {
       return;
     }
 
-    clearInspectionDraft(asset.id);
+    clearInspectionDraft(asset.id,taskId);
     setSubmittedResult({
       record: res.record,
       createdIssuesCount: res.createdIssuesCount ?? 0,
@@ -564,204 +575,7 @@ export const InspectionFormPage: React.FC = () => {
         )}
 
         <form onSubmit={handleSubmitInspection} noValidate className="mt-5 space-y-5">
-          {sections.map(([sectionName, items]) => (
-            <section
-              key={sectionName}
-              className="rounded-2xl border border-[#DCE4EC] bg-white p-4 sm:p-5"
-            >
-              <h2 className="border-b border-[#DCE4EC] pb-2.5 text-sm font-bold text-[#17324D]">
-                {sectionName}
-              </h2>
-
-              <div className="divide-y divide-[#DCE4EC]">
-                {items.map((item) => {
-                  const ans = answers[item.id] ?? {};
-                  const errorMsg = itemErrors[item.id];
-                  const photoErr = photoErrors[item.id];
-                  const needsPhoto =
-                    item.photoRequired ||
-                    (item.photoRequiredOnFail && ans.status === 'non_conforming');
-
-                  return (
-                    <div
-                      key={item.id}
-                      id={`checklist-item-${item.id}`}
-                      className="py-4 first:pt-3 last:pb-1"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-medium text-[#17324D]">
-                          {item.label}
-                          {item.required && (
-                            <span className="ml-1 text-[#B42318]" aria-hidden="true">
-                              *
-                            </span>
-                          )}
-                        </p>
-                      </div>
-
-                      {/* Touch-friendly 3-way selector (44px+ min-height) */}
-                      <div
-                        className="mt-3 grid grid-cols-[1fr_1.35fr_0.75fr] gap-1.5 sm:grid-cols-3 sm:gap-2"
-                        role="group"
-                        aria-label={`Resultado para ${item.label}`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setItemStatus(item.id, 'conforming')}
-                          aria-pressed={ans.status === 'conforming'}
-                          className={`flex min-h-[44px] items-center justify-center gap-1 rounded-xl border px-2 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-colors ${
-                            ans.status === 'conforming'
-                              ? 'border-[#137333] bg-[#ECF7EE] text-[#137333]'
-                              : 'border-[#DCE4EC] bg-white text-[#35506B] hover:bg-[#F4F7FA]'
-                          }`}
-                        >
-                          <Check className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                          <span>Conforme</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setItemStatus(item.id, 'non_conforming')}
-                          aria-pressed={ans.status === 'non_conforming'}
-                          className={`flex min-h-[44px] items-center justify-center gap-1 rounded-xl border px-2 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-colors ${
-                            ans.status === 'non_conforming'
-                              ? 'border-[#B42318] bg-[#FEF3F2] text-[#B42318]'
-                              : 'border-[#DCE4EC] bg-white text-[#35506B] hover:bg-[#F4F7FA]'
-                          }`}
-                        >
-                          <XCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                          <span>Não conforme</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setItemStatus(item.id, 'na')}
-                          aria-pressed={ans.status === 'na'}
-                          className={`flex min-h-[44px] items-center justify-center rounded-xl border px-2 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-colors ${
-                            ans.status === 'na'
-                              ? 'border-[#476078] bg-[#EAF0F6] text-[#17324D]'
-                              : 'border-[#DCE4EC] bg-white text-[#526980] hover:bg-[#F4F7FA]'
-                          }`}
-                        >
-                          N/A
-                        </button>
-                      </div>
-
-                      {/* Numeric input when item type is number */}
-                      {item.type === 'number' && ans.status !== 'na' && (
-                        <div className="mt-3">
-                          <label
-                            htmlFor={`num-${item.id}`}
-                            className="block text-xs font-medium text-[#476078]"
-                          >
-                            Leitura numérica {item.unit ? `(${item.unit})` : ''}
-                          </label>
-                          <input
-                            id={`num-${item.id}`}
-                            type="text"
-                            inputMode="decimal"
-                            value={ans.numericValue ?? ''}
-                            onChange={(e) =>
-                              setItemField(item.id, { numericValue: e.target.value })
-                            }
-                            placeholder={`Ex.: 12.5 ${item.unit ?? ''}`}
-                            className="mt-1 w-full max-w-xs min-h-[42px] rounded-lg border border-[#DCE4EC] px-3 font-mono text-sm text-[#17324D]"
-                          />
-                        </div>
-                      )}
-
-                      {/* Observation text (required on non_conforming) */}
-                      {(ans.status === 'non_conforming' || ans.note) && (
-                        <div className="mt-3">
-                          <label
-                            htmlFor={`note-${item.id}`}
-                            className="block text-xs font-medium text-[#476078]"
-                          >
-                            {ans.status === 'non_conforming'
-                              ? 'Descrição da não conformidade *'
-                              : 'Observação'}
-                          </label>
-                          <textarea
-                            id={`note-${item.id}`}
-                            rows={2}
-                            value={ans.note ?? ''}
-                            onChange={(e) =>
-                              setItemField(item.id, { note: e.target.value })
-                            }
-                            placeholder="Descreva o problema encontrado, peça afetada ou risco..."
-                            className="mt-1 w-full rounded-lg border border-[#DCE4EC] px-3 py-2 text-sm text-[#17324D]"
-                          />
-                        </div>
-                      )}
-
-                      {/* Optional/Required Photo upload */}
-                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                        <label className="inline-flex min-h-[40px] cursor-pointer items-center gap-1.5 rounded-lg border border-[#DCE4EC] bg-[#F4F7FA] px-3 py-1.5 text-xs font-medium text-[#17324D] hover:bg-[#EAF0F6]">
-                          <Camera className="h-4 w-4 text-[#176B5B]" aria-hidden="true" />
-                          <span>
-                            {ans.photoDataUrl
-                              ? 'Trocar foto'
-                              : needsPhoto
-                                ? 'Anexar foto (obrigatório)'
-                                : 'Anexar foto (opcional)'}
-                          </span>
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            onChange={(ev) => handlePhotoUpload(item.id, ev)}
-                            className="sr-only"
-                          />
-                        </label>
-                        <span className="text-[11px] text-[#526980]">
-                          JPG, PNG ou WEBP até 5 MB
-                        </span>
-                      </div>
-
-                      {ans.photoDataUrl && (
-                        <div className="mt-2.5 flex items-center gap-3">
-                          <img
-                            src={ans.photoDataUrl}
-                            alt={`Evidência de ${item.label}`}
-                            referrerPolicy="no-referrer"
-                            className="h-16 w-24 rounded-lg border border-[#DCE4EC] object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setItemField(item.id, {
-                                photoDataUrl: undefined,
-                                photoName: undefined,
-                              })
-                            }
-                            className="inline-flex min-h-[36px] items-center gap-1 text-xs font-medium text-[#B42318]"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                            Remover foto
-                          </button>
-                        </div>
-                      )}
-
-                      {photoErr && (
-                        <p className="mt-1.5 text-xs font-medium text-[#B42318]" role="alert">
-                          {photoErr}
-                        </p>
-                      )}
-
-                      {errorMsg && (
-                        <p
-                          className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-[#B42318]"
-                          role="alert"
-                        >
-                          <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                          {errorMsg}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
+          <ChecklistFields template={template} answers={answers} onChange={setItemField} errors={itemErrors} photoErrors={photoErrors} onPhotoUpload={handlePhotoUpload} />
 
           {/* General Notes */}
           <section className="rounded-2xl border border-[#DCE4EC] bg-white p-4 sm:p-5">

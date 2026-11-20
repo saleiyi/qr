@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import {
   AlertTriangle,
+  CalendarDays,
   ClipboardCheck,
   FileSpreadsheet,
   LayoutDashboard,
@@ -28,6 +29,7 @@ interface AppShellProps {
 
 const NAV_ITEMS = [
   { to: '/app', label: t.nav.overview, icon: LayoutDashboard, end: true },
+  { to: '/app/plans', label: 'Planos e tarefas', icon: CalendarDays, end: false },
   { to: '/app/assets', label: t.nav.assets, icon: Wrench, end: false },
   { to: '/app/issues', label: t.nav.issues, icon: AlertTriangle, end: false },
   { to: '/app/records', label: t.nav.records, icon: FileSpreadsheet, end: false },
