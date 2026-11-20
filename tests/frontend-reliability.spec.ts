@@ -86,6 +86,33 @@ test('draft navigation can be canceled while failed writes preserve the form', a
   await expect(page).toHaveURL(/\/a\/eq-001\/inspect$/);
 });
 
+test('draft failed saves protect input when the browser reloads', async ({ page }) => {
+  await page.goto('/a/eq-001/inspect');
+  await failDraftWrites(page);
+  const notes = page.getByLabel('Observações gerais da inspeção (opcional)');
+  await notes.fill('Preservar esta evidência ao recarregar.');
+  const pendingDialog = page.waitForEvent('dialog', { timeout: 5_000 });
+  // A canceled reload has no load event; bound that expected pending navigation.
+  const reload = page.reload({ timeout: 1_000 }).catch(() => null);
+  const dialog = await pendingDialog;
+  expect(dialog.type()).toBe('beforeunload');
+  await dialog.dismiss();
+  await expect(notes).toHaveValue('Preservar esta evidência ao recarregar.');
+  await reload;
+});
+
+test('draft saved input leaves without a warning and can be resumed', async ({ page }) => {
+  await page.goto('/a/eq-001/inspect');
+  const notes = page.getByLabel('Observações gerais da inspeção (opcional)');
+  await notes.fill('Observação salva antes de retornar à ficha.');
+  await expect(page.getByRole('status').filter({ hasText: /rascunho salvo/i }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Voltar para ficha do equipamento' }).click();
+  await expect(page).toHaveURL(/\/a\/eq-001$/);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.goto('/a/eq-001/inspect');
+  await expect(notes).toHaveValue('Observação salva antes de retornar à ficha.');
+});
+
 test('modal confirmation contains keyboard focus and restores its trigger', async ({ page }) => {
   await page.goto('/a/eq-001/inspect');
   const trigger = page.getByRole('button', { name: 'Limpar', exact: true });

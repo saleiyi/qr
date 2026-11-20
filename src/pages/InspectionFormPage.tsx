@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useBeforeUnload, useBlocker, useNavigate, useParams } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowLeft,
@@ -13,6 +13,7 @@ import {
 import { useAppState } from '../context/AppStateContext';
 import type {
   ChecklistAnswerValue,
+  InspectionDraft,
   InspectionRecord,
   TemplateItem,
 } from '../types/domain';
@@ -28,6 +29,16 @@ import {
 } from '../utils/domainLogic';
 import { formatDateTimeBR } from '../utils/date';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+
+function fingerprintDraft(draft: Omit<InspectionDraft, 'updatedAt'>): string {
+  return JSON.stringify({
+    assetId: draft.assetId,
+    templateId: draft.templateId,
+    inspectorId: draft.inspectorId,
+    generalNotes: draft.generalNotes,
+    answers: draft.answers,
+  });
+}
 
 export const InspectionFormPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -55,6 +66,10 @@ export const InspectionFormPage: React.FC = () => {
   );
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lastSavedFingerprint, setLastSavedFingerprint] = useState<string | null>(null);
+  const [draftSaveState, setDraftSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [draftSaveError, setDraftSaveError] = useState<string | null>(null);
+  const allowLeaveRef = useRef(false);
   const [submittedResult, setSubmittedResult] = useState<{
     record: InspectionRecord;
     createdIssuesCount: number;
@@ -64,6 +79,39 @@ export const InspectionFormPage: React.FC = () => {
     `sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   );
 
+  const draftValues = useMemo(() => ({
+    assetId: asset?.id ?? '',
+    templateId: template?.id ?? '',
+    inspectorId,
+    generalNotes,
+    answers,
+  }), [asset?.id, template?.id, inspectorId, generalNotes, answers]);
+  const currentFingerprint = useMemo(() => fingerprintDraft(draftValues), [draftValues]);
+  const hasContent = Object.keys(answers).length > 0 || generalNotes.trim().length > 0;
+  const hasUnsavedChanges = Boolean(
+    asset && template && !submittedResult &&
+    (hasContent || lastSavedFingerprint !== null) &&
+    currentFingerprint !== lastSavedFingerprint,
+  );
+
+  const blocker = useBlocker(useCallback(
+    ({ currentLocation, nextLocation }) =>
+      hasUnsavedChanges && !allowLeaveRef.current &&
+      currentLocation.pathname !== nextLocation.pathname,
+    [hasUnsavedChanges],
+  ));
+
+  useBeforeUnload(useCallback((event) => {
+    if (hasUnsavedChanges && !allowLeaveRef.current) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+  }, [hasUnsavedChanges]));
+
+  useEffect(() => {
+    if (blocker.state === 'blocked' && !hasUnsavedChanges) blocker.proceed();
+  }, [blocker, hasUnsavedChanges]);
+
   // Restore saved draft if present (and never preselect "Conforme")
   useEffect(() => {
     if (!asset) return;
@@ -72,39 +120,37 @@ export const InspectionFormPage: React.FC = () => {
       setAnswers(saved.answers ?? {});
       setGeneralNotes(saved.generalNotes ?? '');
       if (saved.inspectorId) setInspectorId(saved.inspectorId);
+      setLastSavedFingerprint(fingerprintDraft(saved));
+      setDraftSaveState('saved');
       setDraftRestoredNotice(
         `Rascunho recuperado (salvo em ${formatDateTimeBR(saved.updatedAt)}).`,
       );
     }
   }, [asset?.id]);
 
-  // Auto-persist draft whenever answers or notes change (if not submitted)
-  useEffect(() => {
-    if (!asset || !template || submittedResult) return;
-    const hasAnyInput =
-      Object.keys(answers).length > 0 || generalNotes.trim().length > 0;
-    if (!hasAnyInput) return;
-
-    saveInspectionDraft(
-      {
-        assetId: asset.id,
-        templateId: template.id,
-        inspectorId,
-        generalNotes,
-        updatedAt: new Date().toISOString(),
-        answers,
-      },
+  const persistDraft = useCallback(() => {
+    const result = saveInspectionDraft(
+      { ...draftValues, updatedAt: new Date().toISOString() },
       demoSettings.simulateStorageError,
     );
-  }, [
-    asset,
-    template,
-    inspectorId,
-    generalNotes,
-    answers,
-    submittedResult,
-    demoSettings.simulateStorageError,
-  ]);
+    if (result.ok) {
+      setLastSavedFingerprint(currentFingerprint);
+      setDraftSaveState('saved');
+      setDraftSaveError(null);
+    } else {
+      setDraftSaveState('error');
+      setDraftSaveError(result.error ?? 'Não foi possível salvar o rascunho.');
+    }
+    return result;
+  }, [draftValues, currentFingerprint, demoSettings.simulateStorageError]);
+
+  // Debounce expensive photo serialization and report the actual persistence result.
+  useEffect(() => {
+    if (!hasUnsavedChanges || allowLeaveRef.current) return;
+    setDraftSaveState('saving');
+    const timer = window.setTimeout(persistDraft, 350);
+    return () => window.clearTimeout(timer);
+  }, [hasUnsavedChanges, persistDraft]);
 
   const sections = useMemo(() => {
     if (!template) return [];
@@ -200,17 +246,7 @@ export const InspectionFormPage: React.FC = () => {
   };
 
   const handleManualSaveDraft = () => {
-    const res = saveInspectionDraft(
-      {
-        assetId: asset.id,
-        templateId: template.id,
-        inspectorId,
-        generalNotes,
-        updatedAt: new Date().toISOString(),
-        answers,
-      },
-      demoSettings.simulateStorageError,
-    );
+    const res = persistDraft();
     if (!res.ok) {
       addToast({
         type: 'error',
@@ -227,6 +263,7 @@ export const InspectionFormPage: React.FC = () => {
   };
 
   const handleDiscardDraft = () => {
+    allowLeaveRef.current = true;
     clearInspectionDraft(asset.id);
     setConfirmDiscardOpen(false);
     navigate(`/a/${asset.id}`);
@@ -465,6 +502,41 @@ export const InspectionFormPage: React.FC = () => {
             </div>
           )}
         </section>
+
+        {draftSaveState !== 'idle' && (
+          <div
+            role={draftSaveState === 'error' ? 'alert' : 'status'}
+            className={`mt-4 flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
+              draftSaveState === 'error'
+                ? 'border-[#F4C7C3] bg-[#FEF3F2] text-[#B42318]'
+                : 'border-[#DCE4EC] bg-white text-[#476078]'
+            }`}
+          >
+            <div className="min-w-0">
+              <p className="font-semibold">
+                {draftSaveState === 'error'
+                  ? 'Não foi possível salvar o rascunho'
+                  : draftSaveState === 'saving'
+                    ? 'Salvando rascunho…'
+                    : 'Rascunho salvo neste navegador'}
+              </p>
+              {draftSaveState === 'error' && (
+                <p className="mt-1 text-xs leading-relaxed">
+                  {draftSaveError} Suas respostas continuam nesta tela. Salve novamente antes de sair.
+                </p>
+              )}
+            </div>
+            {draftSaveState === 'error' && (
+              <button
+                type="button"
+                onClick={handleManualSaveDraft}
+                className="min-h-[44px] shrink-0 rounded-lg border border-[#F4C7C3] bg-white px-3 text-xs font-semibold hover:bg-[#FEF3F2]"
+              >
+                Tentar novamente
+              </button>
+            )}
+          </div>
+        )}
 
         <form onSubmit={handleSubmitInspection} noValidate className="mt-5 space-y-5">
           {sections.map(([sectionName, items]) => (
@@ -709,6 +781,17 @@ export const InspectionFormPage: React.FC = () => {
           </div>
         </form>
       </main>
+
+      <ConfirmDialog
+        open={blocker.state === 'blocked'}
+        title="Sair sem salvar o rascunho?"
+        description="As últimas respostas e fotos ainda não foram salvas. Continue preenchendo para tentar salvar novamente, ou saia sem guardar estas alterações."
+        confirmLabel="Sair sem salvar"
+        cancelLabel="Continuar preenchendo"
+        tone="danger"
+        onConfirm={() => { if (blocker.state === 'blocked') blocker.proceed(); }}
+        onCancel={() => { if (blocker.state === 'blocked') blocker.reset(); }}
+      />
 
       <ConfirmDialog
         open={confirmDiscardOpen}
