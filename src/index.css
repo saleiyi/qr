@@ -75,4 +75,27 @@
     width: 100% !important;
     max-width: none !important;
   }
+
+  .inspection-report {
+    overflow-wrap: anywhere;
+    print-color-adjust: exact;
+  }
+
+  .inspection-report article {
+    break-inside: auto;
+  }
+
+  .report-record-header {
+    break-after: avoid;
+  }
+
+  .report-answer,
+  .inspection-report figure {
+    break-inside: avoid;
+  }
+
+  .inspection-report img {
+    max-height: 65mm;
+    max-width: 100%;
+  }
 }
