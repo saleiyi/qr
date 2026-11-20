@@ -1,3 +1,4 @@
+import { Modal } from './Modal';
 import React, { useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import {
@@ -164,11 +165,12 @@ export const AppShell: React.FC<AppShellProps> = ({
 
       {/* Mobile Drawer Navigation */}
       {mobileMenuOpen && (
-        <div
+        <Modal
           className="no-print fixed inset-0 z-50 flex lg:hidden"
           role="dialog"
           aria-modal="true"
           aria-label="Navegação móvel"
+          onClose={() => setMobileMenuOpen(false)}
         >
           <div
             className="fixed inset-0 bg-[#0B1B2B]/60"
@@ -224,7 +226,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               </select>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Main Content Area */}

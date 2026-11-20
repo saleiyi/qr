@@ -36,7 +36,7 @@ async function failDraftWrites(page: Page) {
   });
 }
 
-test('report includes every filtered inspection above twenty records', async ({ page }) => {
+test('report includes every filtered inspection above twenty records', async ({ page }, testInfo) => {
   await seedReport(page);
   await page.goto('/app/records');
   await page.getByRole('button', { name: 'Relatório para impressão / PDF' }).click();
@@ -45,6 +45,11 @@ test('report includes every filtered inspection above twenty records', async ({ 
   await expect(report.getByText('Equipamento para relatório 25', { exact: true })).toBeVisible();
   await page.emulateMedia({ media: 'print' });
   await expect(report.getByText('Equipamento para relatório 25', { exact: true })).toBeVisible();
+  await page.pdf({
+    path: testInfo.outputPath('complete-inspection-report.pdf'),
+    format: 'A4',
+    printBackground: true,
+  });
 });
 
 test('report retains observations and photographic inspection evidence', async ({ page }) => {
@@ -62,6 +67,13 @@ test('draft autosave reports quota failure and can retry without losing notes', 
   await failDraftWrites(page);
   const notes = page.getByLabel('Observações gerais da inspeção (opcional)');
   await notes.fill('Anotação ainda não salva com evidência em campo.');
+  await page.locator('input[type="file"]').first().setInputFiles({
+    name: 'rascunho-evidencia.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(evidencePhoto.split(',')[1], 'base64'),
+  });
+  const photo = page.getByRole('img', { name: /Evidência de/ });
+  await expect(photo).toBeVisible();
   await expect(page.getByRole('alert').filter({ hasText: /rascunho/i })).toBeVisible();
   await expect(notes).toHaveValue('Anotação ainda não salva com evidência em campo.');
   await page.evaluate(() => {
@@ -71,6 +83,7 @@ test('draft autosave reports quota failure and can retry without losing notes', 
   await expect(page.getByRole('status').filter({ hasText: /rascunho salvo/i }).first()).toBeVisible();
   await page.reload();
   await expect(notes).toHaveValue('Anotação ainda não salva com evidência em campo.');
+  await expect(photo).toBeVisible();
 });
 
 test('draft navigation can be canceled while failed writes preserve the form', async ({ page }) => {
@@ -139,4 +152,115 @@ test('modal record details capture focus and dismiss with Escape', async ({ page
   await page.keyboard.press('Escape');
   await expect(drawer).toBeHidden();
   await expect(trigger).toBeFocused();
+});
+
+test('modal nested confirmation keeps editing intact and returns to the parent', async ({ page }) => {
+  await page.goto('/app/assets');
+  const trigger = page.getByRole('button', { name: 'Novo equipamento', exact: true });
+  await trigger.click();
+  const drawer = page.getByRole('dialog', { name: 'Novo equipamento', exact: true });
+  const name = drawer.getByLabel(/Nome do equipamento/);
+  await name.fill('Equipamento com alterações pendentes');
+  await drawer.getByRole('button', { name: 'Fechar painel de equipamento' }).click();
+  const confirmation = page.getByRole('dialog', { name: 'Descartar alterações não salvas?' });
+  for (let index = 0; index < 5; index++) {
+    await page.keyboard.press('Tab');
+    expect(await confirmation.evaluate((dialog) => dialog.contains(document.activeElement))).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(confirmation).toBeHidden();
+  await expect(drawer).toBeVisible();
+  await expect(name).toHaveValue('Equipamento com alterações pendentes');
+  await drawer.getByRole('button', { name: 'Fechar painel de equipamento' }).click();
+  await confirmation.getByRole('button', { name: 'Descartar e fechar' }).click();
+  await expect(drawer).toBeHidden();
+  await expect(trigger).toBeFocused();
+});
+
+test('modal mobile navigation captures focus and can close with Escape', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/app');
+  const trigger = page.getByRole('button', { name: 'Abrir menu de navegação' });
+  await trigger.click();
+  const navigation = page.getByRole('dialog', { name: 'Navegação móvel' });
+  expect(await navigation.evaluate((dialog) => dialog.contains(document.activeElement))).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(navigation).toBeHidden();
+  await expect(trigger).toBeFocused();
+});
+
+test('workflow explicit draft discard leaves without another navigation prompt', async ({ page }) => {
+  await page.goto('/a/eq-001/inspect');
+  await page.getByLabel('Observações gerais da inspeção (opcional)').fill('Rascunho descartado por escolha explícita.');
+  await page.getByRole('button', { name: 'Limpar', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Descartar rascunho', exact: true }).click();
+  await expect(page).toHaveURL(/\/a\/eq-001$/);
+  expect(await page.evaluate(() => localStorage.getItem('ativos_demo_draft_v1_eq-001'))).toBeNull();
+  await page.goto('/a/eq-001/inspect');
+  await expect(page.getByLabel('Observações gerais da inspeção (opcional)')).toHaveValue('');
+});
+
+test('workflow submits inspection evidence and records issue treatment', async ({ page }) => {
+  await page.goto('/a/eq-001/inspect');
+  const previousCount = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('ativos_demo_state_v1')!).records.length as number,
+  );
+  for (const answer of await page.getByRole('button', { name: 'Conforme', exact: true }).all()) {
+    await answer.click();
+  }
+  for (const reading of await page.getByLabel(/Leitura numérica/).all()) await reading.fill('12,5');
+  await page.getByRole('button', { name: 'Não conforme', exact: true }).first().click();
+  await page.getByLabel('Descrição da não conformidade *').fill('Filtro de teste saturado. Trocar antes da próxima operação.');
+  const photo = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 96;
+    canvas.height = 64;
+    const context = canvas.getContext('2d')!;
+    context.fillStyle = '#176B5B';
+    context.fillRect(0, 0, 96, 64);
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  await page.locator('input[type="file"]').first().setInputFiles({
+    name: 'filtro-inspecionado.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(photo, 'base64'),
+  });
+  await expect(page.getByRole('img', { name: /Evidência de/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Finalizar inspeção' }).click();
+  await expect(page.getByRole('heading', { name: 'Inspeção finalizada' })).toBeVisible();
+  const submitted = await page.evaluate(() => JSON.parse(localStorage.getItem('ativos_demo_state_v1')!));
+  expect(submitted.records).toHaveLength(previousCount + 1);
+  expect(submitted.records[0].assetId).toBe('eq-001');
+  expect(submitted.records[0].answers[0].photoDataUrl).toContain('data:image/jpeg');
+  const issueId = submitted.issues[0].id;
+  expect(submitted.issues[0].inspectionId).toBe(submitted.records[0].id);
+  await page.getByRole('link', { name: 'Ver pendências geradas' }).click();
+  await page.getByRole('searchbox', { name: 'Buscar pendências' }).fill('Filtro de teste saturado.');
+  await page.getByRole('button', { name: 'Tratar', exact: true }).click();
+  const issue = page.getByRole('dialog');
+  await issue.getByLabel('Resultado do tratamento e ação corretiva *').fill('Filtro substituído e operação verificada no local.');
+  await issue.getByRole('button', { name: 'Concluir e fechar pendência' }).click();
+  const resolved = await page.evaluate((id) => {
+    const state = JSON.parse(localStorage.getItem('ativos_demo_state_v1')!);
+    return state.issues.find((item: { id: string }) => item.id === id);
+  }, issueId);
+  expect(resolved.status).toBe('resolved');
+  expect(resolved.resolutionNote).toBe('Filtro substituído e operação verificada no local.');
+});
+
+test('responsive primary views fit phone tablet and desktop screens', async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+  for (const width of [375, 768, 1440]) {
+    await page.setViewportSize({ width, height: width === 375 ? 812 : 1000 });
+    for (const [name, route] of [
+      ['assets', '/app/assets'],
+      ['asset-detail', '/app/assets/eq-001'],
+      ['inspection', '/a/eq-001/inspect'],
+    ]) {
+      await page.goto(route);
+      await expect(page.getByRole('main')).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await page.screenshot({ path: testInfo.outputPath(`${name}-${width}.png`), fullPage: true });
+    }
+  }
 });

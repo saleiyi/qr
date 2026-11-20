@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
+import { Modal } from './Modal';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -24,27 +25,12 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 }) => {
   const cancelRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const prevFocus = document.activeElement as HTMLElement | null;
-    cancelRef.current?.focus();
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onCancel();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      prevFocus?.focus?.();
-    };
-  }, [open, onCancel]);
-
   if (!open) return null;
 
   return (
-    <div
+    <Modal
+      onClose={onCancel}
+      initialFocusRef={cancelRef}
       className="no-print fixed inset-0 z-50 flex items-center justify-center bg-[#17324D]/45 p-4"
       role="dialog"
       aria-modal="true"
@@ -102,6 +88,6 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };

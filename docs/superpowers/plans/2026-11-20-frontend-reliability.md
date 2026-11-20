@@ -42,13 +42,13 @@ Playwright; dependencies installed from bun.lock.
 `company: CompanyProfile`, `sites: Site[]`, `issues: Issue[]`, `dateFrom: string`,
 and `dateTo: string`. It renders all records, snapshots, notes, and photos.
 
-- [ ] Add browser tests asserting the 25th filtered record and both general and
+- [x] Add browser tests asserting the 25th filtered record and both general and
   per-item notes and image evidence appear in the print preview.
-- [ ] Run `npm run test:e2e -- --grep report`; expect those assertions to fail.
-- [ ] Extract the printable content without the 20-record cap; add readable
+- [x] Run `npm run test:e2e -- --grep report`; expect those assertions to fail.
+- [x] Extract the printable content without the 20-record cap; add readable
   evidence sections and print wrapping/pagination styles.
-- [ ] Rerun the report regressions, `npm test`, and `npm run lint`; expect pass.
-- [ ] Commit the report implementation and regression setup.
+- [x] Rerun the report regressions, `npm test`, and `npm run lint`; expect pass.
+- [x] Commit the report implementation and regression setup.
 
 ## Task 2: Protect unsaved inspection drafts
 
@@ -59,14 +59,14 @@ and `dateTo: string`. It renders all records, snapshots, notes, and photos.
 and its `StorageResult`; distinguish the current form fingerprint from the last
 successfully persisted fingerprint. Router blocking applies only to unsaved input.
 
-- [ ] Add tests for quota failure visibility, retry, canceled navigation, saved
+- [x] Add tests for quota failure visibility, retry, canceled navigation, saved
   draft restoration, and browser unload protection.
-- [ ] Run `npm run test:e2e -- --grep draft`; expect missing failure/protection
+- [x] Run `npm run test:e2e -- --grep draft`; expect missing failure/protection
   behavior to fail before changing the implementation.
-- [ ] Add brief debounced autosave, inline saving/saved/error feedback, explicit
+- [x] Add brief debounced autosave, inline saving/saved/error feedback, explicit
   retry, and unload/navigation guards; allow intentional discard/submission.
-- [ ] Rerun the draft tests, `npm test`, and `npm run lint`; expect pass.
-- [ ] Commit the draft implementation and tests.
+- [x] Rerun the draft tests, `npm test`, and `npm run lint`; expect pass.
+- [x] Commit the draft implementation and tests.
 
 ## Task 3: Contain modal interactions and verify the frontend
 
@@ -78,11 +78,11 @@ navigation as applicable. Extend `tests/frontend-reliability.spec.ts`.
 `className`, children, and optional initial focus. The native dialog owns focus
 containment and background isolation; close callbacks stay in each caller.
 
-- [ ] Add keyboard tests for Tab/Shift+Tab containment, Escape, focus restoration,
+- [x] Add keyboard tests for Tab/Shift+Tab containment, Escape, focus restoration,
   and nested confirmation; run `npm run test:e2e -- --grep modal` and observe fail.
-- [ ] Introduce the shared dialog and prevent Escape from dismissing a parent.
-- [ ] Run all browser tests, all domain tests, TypeScript and production build.
-- [ ] Inspect desktop, tablet, and phone screenshots and a printed PDF; preserve
+- [x] Introduce the shared dialog and prevent Escape from dismissing a parent.
+- [x] Run all browser tests, all domain tests, TypeScript and production build.
+- [x] Inspect desktop, tablet, and phone screenshots and a printed PDF; preserve
   unrelated behavior and fix any regressions introduced by these changes.
 - [ ] Request one fresh whole-branch review and resolve material findings.
 - [ ] Commit the final change and prepare a reviewable branch/PR.

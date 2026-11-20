@@ -1,3 +1,4 @@
+import { Modal } from '../components/Modal';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
@@ -333,11 +334,12 @@ export const IssuesPage: React.FC = () => {
 
       {/* Slide-over Resolution Drawer */}
       {selectedIssue && (
-        <div
+        <Modal
           className="no-print fixed inset-0 z-50 flex justify-end bg-[#17324D]/45"
           role="dialog"
           aria-modal="true"
           aria-labelledby="issue-drawer-title"
+          onClose={handleCloseDrawer}
         >
           <div className="fixed inset-0" onClick={handleCloseDrawer} />
           <div className="relative z-10 flex h-full w-full max-w-lg flex-col bg-white shadow-2xl">
@@ -525,7 +527,7 @@ export const IssuesPage: React.FC = () => {
               )}
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </AppShell>
   );

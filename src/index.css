@@ -30,6 +30,26 @@
   }
 }
 
+.app-modal {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  overflow: visible;
+  overscroll-behavior: contain;
+}
+
+.app-modal::backdrop {
+  background: transparent;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -56,6 +76,16 @@
 
   .no-print {
     display: none !important;
+  }
+
+  .app-modal[open] {
+    position: static;
+    height: auto;
+    overflow: visible;
+  }
+
+  .app-modal::backdrop {
+    display: none;
   }
 
   .print-only {

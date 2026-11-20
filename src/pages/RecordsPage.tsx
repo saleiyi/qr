@@ -1,3 +1,4 @@
+import { Modal } from '../components/Modal';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
@@ -330,11 +331,12 @@ export const RecordsPage: React.FC = () => {
 
       {/* Inspection Record Detail Drawer */}
       {selectedRecord && (
-        <div
+        <Modal
           className="no-print fixed inset-0 z-50 flex justify-end bg-[#17324D]/45"
           role="dialog"
           aria-modal="true"
           aria-labelledby="record-detail-title"
+          onClose={closeRecordDrawer}
         >
           <div className="fixed inset-0" onClick={closeRecordDrawer} />
           <div className="relative z-10 flex h-full w-full max-w-xl flex-col bg-white shadow-2xl">
@@ -463,16 +465,18 @@ export const RecordsPage: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Printable Report View (A4 Print / Save as PDF) */}
       {printReportOpen && (
-        <div
+        <Modal
           className="fixed inset-0 z-50 flex items-center justify-center bg-[#17324D]/50 p-4 print:static print:block print:bg-white print:p-0"
           role="dialog"
           aria-modal="true"
           aria-labelledby="print-report-title"
+          onClose={() => setPrintReportOpen(false)}
+          printable
         >
           <div className="print-container flex max-h-[92vh] w-full max-w-4xl flex-col rounded-xl border border-[#DCE4EC] bg-white shadow-2xl print:max-h-none print:border-none print:shadow-none">
             <div className="no-print flex items-center justify-between border-b border-[#DCE4EC] px-6 py-4">
@@ -518,7 +522,7 @@ export const RecordsPage: React.FC = () => {
               />
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </AppShell>
   );

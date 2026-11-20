@@ -1,3 +1,4 @@
+import { Modal } from './Modal';
 import React, { useEffect, useRef, useState } from 'react';
 import { Trash2, Upload, X } from 'lucide-react';
 import { useAppState } from '../context/AppStateContext';
@@ -61,7 +62,6 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
 
   useEffect(() => {
     if (!open) return;
-    const prevFocus = document.activeElement as HTMLElement | null;
 
     if (editingAsset) {
       setName(editingAsset.name);
@@ -98,12 +98,6 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
     setErrors({});
     setPhotoError(null);
     setIsDirty(false);
-
-    window.setTimeout(() => firstInputRef.current?.focus(), 50);
-
-    return () => {
-      prevFocus?.focus?.();
-    };
   }, [open, editingAsset, state.assets.length, state.sites, state.members, state.templates]);
 
   const requestClose = () => {
@@ -113,17 +107,6 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
       onClose();
     }
   };
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !confirmDiscardOpen && !confirmDeactivateOpen) {
-        requestClose();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
 
   if (!open) return null;
 
@@ -209,11 +192,13 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
 
   return (
     <>
-      <div
+      <Modal
         className="no-print fixed inset-0 z-40 flex justify-end bg-[#17324D]/40"
         role="dialog"
         aria-modal="true"
         aria-labelledby="asset-drawer-title"
+        onClose={requestClose}
+        initialFocusRef={firstInputRef}
       >
         <div
           className="fixed inset-0"
@@ -663,7 +648,7 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
             </div>
           </form>
         </div>
-      </div>
+      </Modal>
 
       <ConfirmDialog
         open={confirmDiscardOpen}
