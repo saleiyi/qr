@@ -53,21 +53,21 @@ export const InspectionFormPage: React.FC = () => {
   const activeInspectors = state.members.filter(
     (m) => m.status === 'active' && m.role !== 'viewer',
   );
+  const defaultInspectorId = activeInspectors[0]?.id ?? state.members[0]?.id ?? '';
 
-  const [inspectorId, setInspectorId] = useState<string>(
-    activeInspectors[0]?.id ?? state.members[0]?.id ?? '',
-  );
+  const [inspectorId, setInspectorId] = useState(defaultInspectorId);
   const [generalNotes, setGeneralNotes] = useState('');
   const [answers, setAnswers] = useState<DraftAnswerMap>({});
   const [itemErrors, setItemErrors] = useState<Record<string, string>>({});
   const [photoErrors, setPhotoErrors] = useState<Record<string, string>>({});
+  const [pendingPhotoCount, setPendingPhotoCount] = useState(0);
   const [draftRestoredNotice, setDraftRestoredNotice] = useState<string | null>(
     null,
   );
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastSavedFingerprint, setLastSavedFingerprint] = useState<string | null>(null);
-  const [draftSaveState, setDraftSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [draftSaveState, setDraftSaveState] = useState<'idle' | 'processing' | 'saving' | 'saved' | 'error'>('idle');
   const [draftSaveError, setDraftSaveError] = useState<string | null>(null);
   const allowLeaveRef = useRef(false);
   const [submittedResult, setSubmittedResult] = useState<{
@@ -87,11 +87,17 @@ export const InspectionFormPage: React.FC = () => {
     answers,
   }), [asset?.id, template?.id, inspectorId, generalNotes, answers]);
   const currentFingerprint = useMemo(() => fingerprintDraft(draftValues), [draftValues]);
-  const hasContent = Object.keys(answers).length > 0 || generalNotes.trim().length > 0;
+  const initialFingerprint = useMemo(() => fingerprintDraft({
+    assetId: asset?.id ?? '',
+    templateId: template?.id ?? '',
+    inspectorId: defaultInspectorId,
+    generalNotes: '',
+    answers: {},
+  }), [asset?.id, template?.id, defaultInspectorId]);
+  const hasPendingPhotos = pendingPhotoCount > 0;
   const hasUnsavedChanges = Boolean(
     asset && template && !submittedResult &&
-    (hasContent || lastSavedFingerprint !== null) &&
-    currentFingerprint !== lastSavedFingerprint,
+    (hasPendingPhotos || currentFingerprint !== (lastSavedFingerprint ?? initialFingerprint)),
   );
 
   const blocker = useBlocker(useCallback(
@@ -146,11 +152,17 @@ export const InspectionFormPage: React.FC = () => {
 
   // Debounce expensive photo serialization and report the actual persistence result.
   useEffect(() => {
-    if (!hasUnsavedChanges || allowLeaveRef.current) return;
-    setDraftSaveState('saving');
+    if (!hasUnsavedChanges) {
+      setDraftSaveState(lastSavedFingerprint === null ? 'idle' : 'saved');
+      setDraftSaveError(null);
+      return;
+    }
+    if (allowLeaveRef.current) return;
+    setDraftSaveState(hasPendingPhotos ? 'processing' : 'saving');
+    if (hasPendingPhotos) return;
     const timer = window.setTimeout(persistDraft, 350);
     return () => window.clearTimeout(timer);
-  }, [hasUnsavedChanges, persistDraft]);
+  }, [hasUnsavedChanges, hasPendingPhotos, lastSavedFingerprint, persistDraft]);
 
   const sections = useMemo(() => {
     if (!template) return [];
@@ -231,21 +243,32 @@ export const InspectionFormPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     setPhotoErrors((prev) => ({ ...prev, [itemId]: '' }));
-    const res = await processImageUpload(file);
-    if (!res.ok) {
+    setPendingPhotoCount((count) => count + 1);
+    try {
+      const res = await processImageUpload(file);
+      if (!res.ok) {
+        setPhotoErrors((prev) => ({
+          ...prev,
+          [itemId]: res.error ?? 'Erro ao carregar imagem.',
+        }));
+        return;
+      }
+      setItemField(itemId, {
+        photoDataUrl: res.dataUrl,
+        photoName: file.name,
+      });
+    } catch {
       setPhotoErrors((prev) => ({
         ...prev,
-        [itemId]: res.error ?? 'Erro ao carregar imagem.',
+        [itemId]: 'Erro ao carregar imagem. Selecione a foto novamente.',
       }));
-      return;
+    } finally {
+      setPendingPhotoCount((count) => count - 1);
     }
-    setItemField(itemId, {
-      photoDataUrl: res.dataUrl,
-      photoName: file.name,
-    });
   };
 
   const handleManualSaveDraft = () => {
+    if (hasPendingPhotos) return;
     const res = persistDraft();
     if (!res.ok) {
       addToast({
@@ -271,7 +294,7 @@ export const InspectionFormPage: React.FC = () => {
 
   const handleSubmitInspection = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting || submittedResult) return;
+    if (isSubmitting || submittedResult || hasPendingPhotos) return;
 
     const validationErrors = validateInspectionDraft(template, answers);
     if (validationErrors.length > 0) {
@@ -516,9 +539,11 @@ export const InspectionFormPage: React.FC = () => {
               <p className="font-semibold">
                 {draftSaveState === 'error'
                   ? 'Não foi possível salvar o rascunho'
-                  : draftSaveState === 'saving'
-                    ? 'Salvando rascunho…'
-                    : 'Rascunho salvo neste navegador'}
+                  : draftSaveState === 'processing'
+                    ? 'Processando foto… Aguarde antes de salvar ou finalizar.'
+                    : draftSaveState === 'saving'
+                      ? 'Salvando rascunho…'
+                      : 'Rascunho salvo neste navegador'}
               </p>
               {draftSaveState === 'error' && (
                 <p className="mt-1 text-xs leading-relaxed">
@@ -762,14 +787,15 @@ export const InspectionFormPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleManualSaveDraft}
-                className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#DCE4EC] bg-white px-3 text-xs sm:text-sm font-semibold text-[#17324D] hover:bg-[#F4F7FA] whitespace-nowrap"
+                disabled={hasPendingPhotos}
+                className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#DCE4EC] bg-white px-3 text-xs sm:text-sm font-semibold text-[#17324D] hover:bg-[#F4F7FA] disabled:opacity-60 whitespace-nowrap"
               >
                 <Save className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span>Salvar rascunho</span>
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || hasPendingPhotos}
                 className="inline-flex min-h-[44px] flex-[1.25] items-center justify-center gap-1.5 rounded-xl bg-[#176B5B] px-3.5 text-xs sm:text-sm font-semibold text-white hover:bg-[#125548] disabled:opacity-60 whitespace-nowrap"
               >
                 <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />

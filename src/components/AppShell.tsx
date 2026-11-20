@@ -1,5 +1,5 @@
 import { Modal } from './Modal';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -44,6 +44,16 @@ export const AppShell: React.FC<AppShellProps> = ({
   const { effectiveState, stats, demoSettings, setDemoRole } = useAppState();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+
+  useEffect(() => {
+    const desktop = window.matchMedia('(min-width: 1024px)');
+    const closeMobileMenu = () => {
+      if (desktop.matches) setMobileMenuOpen(false);
+    };
+    closeMobileMenu();
+    desktop.addEventListener('change', closeMobileMenu);
+    return () => desktop.removeEventListener('change', closeMobileMenu);
+  }, []);
 
   const renderNavLinks = (onNavigate?: () => void) => (
     <nav className="flex flex-col gap-1 px-3 py-4" aria-label="Menu principal do painel">

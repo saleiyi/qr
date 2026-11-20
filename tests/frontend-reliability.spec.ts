@@ -126,6 +126,70 @@ test('draft saved input leaves without a warning and can be resumed', async ({ p
   await expect(notes).toHaveValue('Observação salva antes de retornar à ficha.');
 });
 
+test('draft edge inspector-only changes are saved and restored', async ({ page }) => {
+  await page.goto('/a/eq-001/inspect');
+  const inspector = page.getByLabel('Responsável pela inspeção');
+  await inspector.selectOption({ index: 1 });
+  const selectedInspector = await inspector.inputValue();
+  await expect(page.getByRole('status').filter({ hasText: /rascunho salvo/i }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Voltar para ficha do equipamento' }).click();
+  await expect(page).toHaveURL(/\/a\/eq-001$/);
+  await page.goto('/a/eq-001/inspect');
+  await expect(inspector).toHaveValue(selectedInspector);
+});
+
+test('draft edge reverting unsaved changes restores the saved status', async ({ page }) => {
+  await page.goto('/a/eq-001/inspect');
+  const notes = page.getByLabel('Observações gerais da inspeção (opcional)');
+  const savedStatus = page.getByRole('status').filter({ hasText: /rascunho salvo/i }).first();
+  await notes.fill('Observação já salva.');
+  await expect(savedStatus).toBeVisible();
+  await notes.fill('Alteração temporária.');
+  await expect(page.getByRole('status').filter({ hasText: 'Salvando rascunho…' })).toBeVisible();
+  await notes.fill('Observação já salva.');
+  await expect(savedStatus).toBeVisible();
+  await failDraftWrites(page);
+  await notes.fill('Alteração que falhou ao salvar.');
+  await expect(page.getByRole('alert').filter({ hasText: /rascunho/i })).toBeVisible();
+  await notes.fill('Observação já salva.');
+  await expect(savedStatus).toBeVisible();
+});
+
+test('draft edge pending photos block incomplete saving and navigation', async ({ page }) => {
+  await page.goto('/a/eq-001/inspect');
+  await page.getByLabel('Observações gerais da inspeção (opcional)').fill('Rascunho antes da foto.');
+  await expect(page.getByRole('status').filter({ hasText: /rascunho salvo/i }).first()).toBeVisible();
+  await page.evaluate(() => {
+    const original = FileReader.prototype.readAsDataURL;
+    const pending: Array<() => void> = [];
+    FileReader.prototype.readAsDataURL = function (file) {
+      pending.push(() => original.call(this, file));
+    };
+    (window as unknown as { finishPhotoRead: () => void }).finishPhotoRead = () => {
+      FileReader.prototype.readAsDataURL = original;
+      pending.forEach((read) => read());
+    };
+  });
+  await page.locator('input[type="file"]').first().setInputFiles({
+    name: 'foto-em-processamento.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(evidencePhoto.split(',')[1], 'base64'),
+  });
+  await expect(page.getByRole('button', { name: 'Salvar rascunho', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Finalizar inspeção' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Voltar para ficha do equipamento' }).click();
+  const confirmation = page.getByRole('dialog', { name: 'Sair sem salvar o rascunho?' });
+  await expect(confirmation).toBeVisible();
+  await confirmation.getByRole('button', { name: 'Continuar preenchendo' }).click();
+  await page.evaluate(() => {
+    (window as unknown as { finishPhotoRead: () => void }).finishPhotoRead();
+  });
+  await expect(page.getByRole('img', { name: /Evidência de/ })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: /rascunho salvo/i }).first()).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('img', { name: /Evidência de/ })).toBeVisible();
+});
+
 test('modal confirmation contains keyboard focus and restores its trigger', async ({ page }) => {
   await page.goto('/a/eq-001/inspect');
   const trigger = page.getByRole('button', { name: 'Limpar', exact: true });
@@ -187,6 +251,16 @@ test('modal mobile navigation captures focus and can close with Escape', async (
   await page.keyboard.press('Escape');
   await expect(navigation).toBeHidden();
   await expect(trigger).toBeFocused();
+});
+
+test('modal edge mobile navigation releases desktop controls after resize', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Abrir menu de navegação' }).click();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+  await page.getByRole('link', { name: /Equipamentos/ }).first().click();
+  await expect(page).toHaveURL(/\/app\/assets$/);
 });
 
 test('workflow explicit draft discard leaves without another navigation prompt', async ({ page }) => {

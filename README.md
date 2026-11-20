@@ -34,7 +34,8 @@ Screenshots, failure traces, and an example complete report PDF are written unde
 
 Browser tests cover reports exceeding 20 records, inspection evidence, failed
 draft persistence and retry, navigation/unload protection, nested modal keyboard
-navigation, submission/issue treatment, and 375px/768px/1440px layouts.
+navigation, pending photo processing, inspector-only edits, reverting saved input,
+mobile menu resizing, submission/issue treatment, and 375px/768px/1440px layouts.
 
 ## Preview hosting
 
@@ -44,3 +45,4 @@ fallback for application paths such as `/app/assets/eq-001` and `/a/eq-001`.
 Drafts and demo data are browser-local. Use the reset action in Settings to return
 to the initial examples. Failed saves preserve current input and display a retry
 action; the browser warns before leaving with unsaved inspection input.
+While a photo is being processed, saving and submission wait for the attachment.

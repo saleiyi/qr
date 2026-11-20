@@ -1,7 +1,7 @@
 # Frontend Reliability Implementation Plan
 
 > **For agentic workers:** Use superpowers:executing-plans to implement this plan
-> task by task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> task by task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Correct report completeness, protect inspection drafts, and make modal
 keyboard interactions reliable without adding a backend.
@@ -84,5 +84,5 @@ containment and background isolation; close callbacks stay in each caller.
 - [x] Run all browser tests, all domain tests, TypeScript and production build.
 - [x] Inspect desktop, tablet, and phone screenshots and a printed PDF; preserve
   unrelated behavior and fix any regressions introduced by these changes.
-- [ ] Request one fresh whole-branch review and resolve material findings.
-- [ ] Commit the final change and prepare a reviewable branch/PR.
+- [x] Request one fresh whole-branch review and resolve material findings.
+- [x] Commit the final change and prepare a reviewable branch/PR.
