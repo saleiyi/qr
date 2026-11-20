@@ -86,22 +86,22 @@ test('operations QR request flows through assignment treatment return and approv
   await page.getByRole('link', { name: 'Ver solicitação no painel' }).click();
   const detail = page.getByRole('dialog', { name: 'Ruído no compressor da linha' });
   await expect(detail).toBeVisible();
+  await expect(detail.getByText('Solicitação registrada', { exact: true })).toHaveCount(1);
+  await expect(detail.getByText('Solicitação recebida', { exact: true })).toHaveCount(0);
   await detail.getByLabel('Responsável pelo atendimento').selectOption({ index: 1 });
   await detail.getByRole('button', { name: 'Salvar atribuição', exact: true }).click();
   await detail.getByRole('button', { name: 'Iniciar atendimento', exact: true }).click();
   await detail
     .getByLabel('Resultado do tratamento e ação corretiva *')
     .fill('Rolamento substituído e vibração verificada.');
-  await detail
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: 'reparo.png',
-      mimeType: 'image/png',
-      buffer: Buffer.from(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=',
-        'base64',
-      ),
-    });
+  await detail.locator('input[type="file"]').setInputFiles({
+    name: 'reparo.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=',
+      'base64',
+    ),
+  });
   await expect(detail.getByRole('img', { name: 'Foto do tratamento' })).toBeVisible();
   await detail.getByRole('button', { name: 'Enviar para verificação', exact: true }).click();
   await expect(detail.getByText('Aguardando verificação', { exact: true }).first()).toBeVisible();
@@ -114,6 +114,7 @@ test('operations QR request flows through assignment treatment return and approv
   await detail
     .getByLabel('Observações da verificação')
     .fill('Teste concluído e operação liberada.');
+  await expect(detail.locator('aside img')).toHaveCount(2);
   await detail.getByRole('button', { name: 'Aprovar e concluir', exact: true }).click();
   await expect(
     detail.getByText('Tratamento aprovado e ordem concluída', { exact: true }),

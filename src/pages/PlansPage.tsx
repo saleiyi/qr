@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { Link, useBlocker, useBeforeUnload } from 'react-router-dom';
 import {
   CalendarDays,
   ChevronLeft,
@@ -50,6 +50,20 @@ export function PlansPage() {
   });
   const [draft, setDraft] = useState<PlanDraft>(newDraft);
   const [baseline, setBaseline] = useState('');
+  const allowLeave = useRef(false);
+  const dirty = open && JSON.stringify(draft) !== baseline;
+  const blocker = useBlocker(useCallback(() => dirty && !allowLeave.current, [dirty]));
+  useBeforeUnload(
+    useCallback(
+      (event) => {
+        if (dirty && !allowLeave.current) {
+          event.preventDefault();
+          event.returnValue = '';
+        }
+      },
+      [dirty],
+    ),
+  );
   const [search, setSearch] = useState('');
   const assets = state.assets.filter((a) => a.operationalStatus !== 'inactive');
   const tasks = state.tasks.filter((task) =>
@@ -84,6 +98,7 @@ export function PlansPage() {
   );
   const close = () => (JSON.stringify(draft) !== baseline ? setDiscard(true) : setOpen(false));
   const startNew = () => {
+    allowLeave.current = false;
     const next = newDraft();
     setDraft(next);
     setBaseline(JSON.stringify(next));
@@ -137,7 +152,9 @@ export function PlansPage() {
             className="flex items-center justify-between rounded-xl border border-[#DCE4EC] bg-white p-3 text-left hover:border-[#176B5B] sm:p-4"
           >
             <div>
-              <p className="min-h-[32px] text-xs leading-relaxed text-[#526980] sm:min-h-0 sm:text-sm">{item.label}</p>
+              <p className="min-h-[32px] text-xs leading-relaxed text-[#526980] sm:min-h-0 sm:text-sm">
+                {item.label}
+              </p>
               <p
                 className={`mt-1 text-2xl font-bold tabular-nums ${item.key === 'overdue' && item.value ? 'text-[#B42318]' : 'text-[#17324D]'}`}
               >
@@ -148,6 +165,7 @@ export function PlansPage() {
           </button>
         ))}
       </div>
+      <FormError message={state.scheduleWarnings?.join(' ')} />
       <section className="mt-6 overflow-hidden rounded-xl border border-[#DCE4EC] bg-white">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#DCE4EC] p-4">
           <div className="flex flex-wrap items-center gap-2">
@@ -369,8 +387,8 @@ export function PlansPage() {
           </div>
         )}
         <footer className="border-t border-[#DCE4EC] bg-[#F8FAFC] px-4 py-3 text-xs text-[#526980]">
-          {filtered.length} tarefa(s) no filtro · Programação dos próximos 90 dias, salva neste
-          navegador.
+          {filtered.length} tarefa(s) no filtro · Agenda dos últimos 30 e próximos 90 dias, com
+          execuções anteriores preservadas.
         </footer>
       </section>
       <section className="mt-6">
@@ -394,9 +412,9 @@ export function PlansPage() {
           onClose={close}
         >
           <form
-            onSubmit={(event) => {
+            onSubmit={async (event) => {
               event.preventDefault();
-              const result = savePlan(draft);
+              const result = await savePlan(draft);
               if (!result.ok) {
                 setError(result.error ?? 'Não foi possível criar o plano.');
                 return;
@@ -521,15 +539,21 @@ export function PlansPage() {
         </PanelModal>
       )}
       <ConfirmDialog
-        open={discard}
+        open={discard || blocker.state === 'blocked'}
         title="Descartar este plano?"
         description="As configurações ainda não foram salvas."
         confirmLabel="Descartar plano"
+        cancelLabel="Continuar preenchendo"
         onConfirm={() => {
+          allowLeave.current = true;
           setDiscard(false);
           setOpen(false);
+          if (blocker.state === 'blocked') blocker.proceed();
         }}
-        onCancel={() => setDiscard(false)}
+        onCancel={() => {
+          setDiscard(false);
+          if (blocker.state === 'blocked') blocker.reset();
+        }}
       />
     </AppShell>
   );

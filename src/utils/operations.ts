@@ -6,7 +6,7 @@ import type {
   IssuePriority,
 } from '../types/domain';
 import { APP_CONFIG } from '../config/appConfig';
-import { addDaysISODate } from './date';
+import { addDaysISODate, diffDays } from './date';
 
 export function validDate(value: string): boolean {
   return (
@@ -20,6 +20,7 @@ export function generatePlanTasks(
   plan: InspectionPlan,
   throughDate: string,
   existing: InspectionTask[] = [],
+  fromDate: string = plan.startDate,
 ): InspectionTask[] {
   if (
     !validDate(plan.startDate) ||
@@ -33,7 +34,20 @@ export function generatePlanTasks(
   const anchor = new Date(`${plan.startDate}T12:00:00Z`);
   const stored = new Map(existing.map((task) => [task.id, task]));
   const tasks: InspectionTask[] = [];
-  for (let step = 0; ; step++) {
+  const startStep =
+    plan.frequency === 'monthly'
+      ? Math.max(
+          0,
+          (Number(fromDate.slice(0, 4)) - anchor.getUTCFullYear()) * 12 +
+            Number(fromDate.slice(5, 7)) -
+            1 -
+            anchor.getUTCMonth(),
+        )
+      : Math.max(
+          0,
+          Math.ceil(diffDays(fromDate, plan.startDate) / (plan.frequency === 'weekly' ? 7 : 1)),
+        );
+  for (let step = startStep; ; step++) {
     const date = new Date(anchor);
     if (plan.frequency === 'monthly') {
       date.setUTCDate(1);
@@ -45,6 +59,7 @@ export function generatePlanTasks(
     } else date.setUTCDate(anchor.getUTCDate() + step * (plan.frequency === 'weekly' ? 7 : 1));
     const dueDate = date.toISOString().slice(0, 10);
     if (dueDate > throughDate) break;
+    if (dueDate < fromDate) continue;
     if (tasks.length + plan.assetIds.length > 10000)
       throw new Error('O período gera muitas tarefas. Escolha uma data inicial mais recente.');
     for (const assetId of plan.assetIds) {
@@ -66,6 +81,24 @@ export function generatePlanTasks(
   return tasks;
 }
 
+export function materializePlanTasks(
+  plan: InspectionPlan,
+  referenceDate: string,
+  existing: InspectionTask[] = [],
+): InspectionTask[] {
+  const fromDate = addDaysISODate(referenceDate, -30);
+  const throughDate = addDaysISODate(referenceDate, 90);
+  const tasks = new Map(existing.map((task) => [task.id, task]));
+  for (const task of generatePlanTasks(
+    plan,
+    throughDate,
+    existing,
+    fromDate > plan.startDate ? fromDate : plan.startDate,
+  ))
+    tasks.set(task.id, task);
+  return [...tasks.values()];
+}
+
 /** Add new collections to old browser saves without replacing equipment edits. */
 export function normalizeOperationsState(state: AppStateData): AppStateData {
   const normalized = {
@@ -75,25 +108,25 @@ export function normalizeOperationsState(state: AppStateData): AppStateData {
     templateDrafts: Array.isArray(state.templateDrafts) ? state.templateDrafts : [],
   };
   const tasks = new Map(normalized.tasks.map((task) => [task.id, task]));
+  const scheduleWarnings: string[] = [];
   for (const plan of normalized.plans) {
     try {
-      for (const task of generatePlanTasks(
-        plan,
-        addDaysISODate(APP_CONFIG.demoClockDate, 90),
-        normalized.tasks,
-      ))
+      for (const task of materializePlanTasks(plan, APP_CONFIG.demoClockDate, normalized.tasks))
         tasks.set(task.id, task);
-    } catch {
-      // A damaged plan must never replace the user's equipment or saved records.
+    } catch (error) {
+      scheduleWarnings.push(
+        `${plan.name}: ${error instanceof Error ? error.message : 'Não foi possível gerar a agenda.'}`,
+      );
     }
   }
-  return { ...normalized, tasks: [...tasks.values()] };
+  return { ...normalized, tasks: [...tasks.values()], scheduleWarnings };
 }
 
 export type WorkOrderAction = 'assign' | 'start' | 'submit' | 'approve' | 'reject';
 export interface WorkOrderChange {
   actorId: string;
   assigneeId?: string;
+  assigneeName?: string;
   dueDate?: string;
   priority?: IssuePriority;
   note?: string;
@@ -149,7 +182,39 @@ export function transitionWorkOrder(
   }
   updated.timeline = [
     ...(issue.timeline ?? []),
-    { id: crypto.randomUUID(), at: now, actorId: change.actorId, label, note },
+    ...(action === 'submit' &&
+    issue.treatmentPhotoDataUrl &&
+    !issue.timeline?.some((event) => event.photoDataUrl === issue.treatmentPhotoDataUrl)
+      ? [
+          {
+            id: crypto.randomUUID(),
+            at: issue.updatedAt,
+            actorId: issue.assigneeId,
+            label: 'Tratamento anterior preservado',
+            note: issue.resolutionNote,
+            photoDataUrl: issue.treatmentPhotoDataUrl,
+            photoName: issue.treatmentPhotoName,
+          },
+        ]
+      : []),
+    {
+      id: crypto.randomUUID(),
+      at: now,
+      actorId: change.actorId,
+      label,
+      note,
+      ...(action === 'submit'
+        ? { photoDataUrl: updated.treatmentPhotoDataUrl, photoName: updated.treatmentPhotoName }
+        : {}),
+      ...(action === 'assign'
+        ? {
+            assigneeId: updated.assigneeId,
+            assigneeName: change.assigneeName,
+            dueDate: updated.dueDate,
+            priority: updated.priority,
+          }
+        : {}),
+    },
   ];
   return updated;
 }

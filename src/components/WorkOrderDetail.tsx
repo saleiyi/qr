@@ -64,9 +64,22 @@ export function WorkOrderDetail({ issue, onClose }: { issue: Issue; onClose: () 
     ),
   );
   const close = () => (dirty ? setDiscard(true) : onClose());
-  const act = (action: WorkOrderAction) => {
+  const history = [
+    ...(!issue.timeline?.some((event) => event.label === 'Solicitação registrada')
+      ? [
+          {
+            id: 'created',
+            at: issue.createdAt,
+            actorId: '',
+            label: issue.inspectionId ? 'Aberta pela inspeção' : 'Solicitação recebida',
+          },
+        ]
+      : []),
+    ...(issue.timeline ?? []),
+  ];
+  const act = async (action: WorkOrderAction) => {
     if (processing) return;
-    const result = changeWorkOrder(issue.id, action, {
+    const result = await changeWorkOrder(issue.id, action, {
       actorId: actor,
       assigneeId: assignee,
       dueDate,
@@ -327,16 +340,7 @@ export function WorkOrderDetail({ issue, onClose }: { issue: Issue; onClose: () 
             <h3 className="font-semibold">Histórico do atendimento</h3>
             <p className="mt-2 break-all text-[11px] text-[#526980]">{issue.id}</p>
             <ol className="mt-5 space-y-5 border-l border-[#DCE4EC] pl-4">
-              {[
-                {
-                  id: 'created',
-                  at: issue.createdAt,
-                  actorId: '',
-                  label: issue.inspectionId ? 'Aberta pela inspeção' : 'Solicitação recebida',
-                  note: undefined,
-                },
-                ...(issue.timeline ?? []),
-              ].map((event) => (
+              {history.map((event) => (
                 <li key={event.id} className="relative">
                   <span className="absolute -left-[21px] top-1 h-2 w-2 rounded-full bg-[#176B5B]" />
                   <p className="text-xs font-semibold leading-relaxed">{event.label}</p>
@@ -351,6 +355,33 @@ export function WorkOrderDetail({ issue, onClose }: { issue: Issue; onClose: () 
                     <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed text-[#476078]">
                       {event.note}
                     </p>
+                  )}
+                  {event.assigneeId && (
+                    <p className="mt-2 text-xs leading-relaxed text-[#526980]">
+                      {event.assigneeName ??
+                        state.members.find((member) => member.id === event.assigneeId)?.name ??
+                        event.assigneeId}{' '}
+                      · {formatDateBR(event.dueDate)} ·{' '}
+                      {event.priority === 'high'
+                        ? 'Alta'
+                        : event.priority === 'medium'
+                          ? 'Média'
+                          : 'Baixa'}
+                    </p>
+                  )}
+                  {event.photoDataUrl && (
+                    <figure className="mt-2">
+                      <img
+                        src={event.photoDataUrl}
+                        alt={`Evidência do tratamento em ${formatDateTimeBR(event.at)}`}
+                        className="max-h-48 max-w-full rounded-lg border border-[#DCE4EC] object-contain"
+                      />
+                      {event.photoName && (
+                        <figcaption className="mt-1 break-words text-[11px] text-[#526980]">
+                          {event.photoName}
+                        </figcaption>
+                      )}
+                    </figure>
                   )}
                 </li>
               ))}

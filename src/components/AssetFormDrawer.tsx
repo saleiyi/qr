@@ -123,7 +123,7 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
     setIsDirty(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const numericCycle = Number(cycleDays);
     const validation = validateAssetInput(
@@ -144,7 +144,7 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
     }
 
     if (isEditing && editingAsset) {
-      const res = updateAsset(editingAsset.id, {
+      const res = await updateAsset(editingAsset.id, {
         name: name.trim(),
         code: code.trim().toUpperCase(),
         category,
@@ -165,7 +165,7 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
         onClose();
       }
     } else {
-      const res = createAsset({
+      const res = await createAsset({
         name: name.trim(),
         code: code.trim().toUpperCase(),
         category,
@@ -610,9 +610,9 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
                   {editingAsset.operationalStatus === 'inactive' ? (
                     <button
                       type="button"
-                      onClick={() => {
-                        reactivateAsset(editingAsset.id);
-                        onClose();
+                      onClick={async () => {
+                        const result=await reactivateAsset(editingAsset.id);
+                        if(result.ok)onClose();
                       }}
                       className="rounded-lg border border-[#176B5B] px-3 py-1.5 text-xs font-semibold text-[#176B5B] hover:bg-[#EAF4F1] whitespace-nowrap"
                     >
@@ -671,9 +671,10 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
         confirmLabel="Confirmar desativação"
         cancelLabel="Cancelar"
         tone="danger"
-        onConfirm={() => {
+        onConfirm={async () => {
           if (editingAsset) {
-            deactivateAsset(editingAsset.id);
+            const result=await deactivateAsset(editingAsset.id);
+            if(!result.ok)return;
           }
           setConfirmDeactivateOpen(false);
           onClose();

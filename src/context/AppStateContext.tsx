@@ -1,3 +1,8 @@
+import {
+  persistInspection,
+  type InspectionSubmissionInput,
+  type InspectionSubmissionOutcome,
+} from './inspectionAction';
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { APP_CONFIG } from '../config/appConfig';
 import { createOperationsActions, type OperationsActions } from './operationsActions';
@@ -12,11 +17,7 @@ import type {
   Member,
   UserRole,
 } from '../types/domain';
-import {
-  loadAppState,
-  resetAppStateStorage,
-  saveAppState,
-} from '../services/storageAdapter';
+import { loadAppState, resetAppStateStorage, transactAppState } from '../services/storageAdapter';
 import {
   buildInspectionSubmission,
   computeWorkspaceStats,
@@ -43,40 +44,30 @@ interface AppStateContextValue extends OperationsActions {
   dismissToast: (id: string) => void;
   createAsset: (
     draft: Omit<Asset, 'id' | 'createdAt' | 'updatedAt' | 'files'>,
-  ) => { ok: boolean; asset?: Asset; error?: string };
-  updateAsset: (
-    assetId: string,
-    patch: Partial<Asset>,
-  ) => { ok: boolean; error?: string };
-  deactivateAsset: (assetId: string) => { ok: boolean; error?: string };
-  reactivateAsset: (assetId: string) => { ok: boolean; error?: string };
+  ) => Promise<{ ok: boolean; asset?: Asset; error?: string }>;
+  updateAsset: (assetId: string, patch: Partial<Asset>) => Promise<{ ok: boolean; error?: string }>;
+  deactivateAsset: (assetId: string) => Promise<{ ok: boolean; error?: string }>;
+  reactivateAsset: (assetId: string) => Promise<{ ok: boolean; error?: string }>;
   importAssetsBatch: (
     drafts: Array<Omit<Asset, 'id' | 'createdAt' | 'updatedAt' | 'files'>>,
-  ) => { ok: boolean; importedCount: number; error?: string };
-  submitInspection: (params: {
-    assetId: string;
-    templateId: string;
-    inspectorId: string;
-    generalNotes: string;
-    answers: DraftAnswerMap;
-    idempotencyKey: string;
-    taskId?: string;
-  }) => { ok: boolean; record?: InspectionRecord; createdIssuesCount?: number; error?: string };
+  ) => Promise<{ ok: boolean; importedCount: number; error?: string }>;
+  submitInspection: (params: InspectionSubmissionInput) => Promise<InspectionSubmissionOutcome>;
   applyTemplateToCategory: (
     templateId: string,
     category: string,
-  ) => { ok: boolean; updatedCount: number; error?: string };
-  updateCompany: (company: CompanyProfile) => { ok: boolean; error?: string };
-  addMember: (member: Omit<Member, 'id'>) => { ok: boolean; error?: string };
-  updateMember: (memberId: string, patch: Partial<Member>) => { ok: boolean; error?: string };
-  resetDemoData: () => void;
+  ) => Promise<{ ok: boolean; updatedCount: number; error?: string }>;
+  updateCompany: (company: CompanyProfile) => Promise<{ ok: boolean; error?: string }>;
+  addMember: (member: Omit<Member, 'id'>) => Promise<{ ok: boolean; error?: string }>;
+  updateMember: (
+    memberId: string,
+    patch: Partial<Member>,
+  ) => Promise<{ ok: boolean; error?: string }>;
+  resetDemoData: () => Promise<void>;
 }
 
 const AppStateContext = createContext<AppStateContextValue | null>(null);
 
-export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<AppStateData>(() => loadAppState());
   const [demoSettings, setDemoSettings] = useState<DemoSettings>({
     simulateLoading: false,
@@ -99,20 +90,20 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const commitState = useCallback(
-    (nextState: AppStateData): { ok: boolean; error?: string } => {
-      const result = saveAppState(nextState, demoSettings.simulateStorageError);
+    async (nextState: AppStateData): Promise<{ ok: boolean; error?: string }> => {
+      const result = await transactAppState(
+        () => ({ next: nextState, value: undefined }),
+        demoSettings.simulateStorageError,
+        { value: state.revision },
+      );
       if (!result.ok) {
-        addToast({
-          type: 'error',
-          title: 'Erro ao salvar alterações',
-          description: result.error,
-        });
+        addToast({ type: 'error', title: 'Erro ao salvar alterações', description: result.error });
         return { ok: false, error: result.error };
       }
-      setState(nextState);
+      setState(result.state!);
       return { ok: true };
     },
-    [demoSettings.simulateStorageError, addToast],
+    [state, demoSettings.simulateStorageError, addToast],
   );
 
   const setDemoRole = useCallback((role: UserRole) => {
@@ -120,7 +111,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const createAsset = useCallback(
-    (draft: Omit<Asset, 'id' | 'createdAt' | 'updatedAt' | 'files'>) => {
+    async (draft: Omit<Asset, 'id' | 'createdAt' | 'updatedAt' | 'files'>) => {
       const nowISO = APP_CONFIG.demoClockISO;
       const newAsset: Asset = {
         ...draft,
@@ -134,7 +125,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
         ...state,
         assets: [newAsset, ...state.assets],
       };
-      const res = commitState(nextState);
+      const res = await commitState(nextState);
       if (!res.ok) return { ok: false, error: res.error };
       addToast({
         type: 'success',
@@ -147,7 +138,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const updateAsset = useCallback(
-    (assetId: string, patch: Partial<Asset>) => {
+    async (assetId: string, patch: Partial<Asset>) => {
       const nowISO = APP_CONFIG.demoClockISO;
       const nextAssets = state.assets.map((a) =>
         a.id === assetId
@@ -159,7 +150,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
             }
           : a,
       );
-      const res = commitState({ ...state, assets: nextAssets });
+      const res = await commitState({ ...state, assets: nextAssets });
       if (!res.ok) return { ok: false, error: res.error };
       addToast({
         type: 'success',
@@ -172,14 +163,12 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const deactivateAsset = useCallback(
-    (assetId: string) => {
+    async (assetId: string) => {
       const nowISO = APP_CONFIG.demoClockISO;
       const nextAssets = state.assets.map((a) =>
-        a.id === assetId
-          ? { ...a, operationalStatus: 'inactive' as const, updatedAt: nowISO }
-          : a,
+        a.id === assetId ? { ...a, operationalStatus: 'inactive' as const, updatedAt: nowISO } : a,
       );
-      const res = commitState({ ...state, assets: nextAssets });
+      const res = await commitState({ ...state, assets: nextAssets });
       if (!res.ok) return { ok: false, error: res.error };
       addToast({
         type: 'info',
@@ -192,14 +181,12 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const reactivateAsset = useCallback(
-    (assetId: string) => {
+    async (assetId: string) => {
       const nowISO = APP_CONFIG.demoClockISO;
       const nextAssets = state.assets.map((a) =>
-        a.id === assetId
-          ? { ...a, operationalStatus: 'active' as const, updatedAt: nowISO }
-          : a,
+        a.id === assetId ? { ...a, operationalStatus: 'active' as const, updatedAt: nowISO } : a,
       );
-      const res = commitState({ ...state, assets: nextAssets });
+      const res = await commitState({ ...state, assets: nextAssets });
       if (!res.ok) return { ok: false, error: res.error };
       addToast({
         type: 'success',
@@ -212,7 +199,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const importAssetsBatch = useCallback(
-    (drafts: Array<Omit<Asset, 'id' | 'createdAt' | 'updatedAt' | 'files'>>) => {
+    async (drafts: Array<Omit<Asset, 'id' | 'createdAt' | 'updatedAt' | 'files'>>) => {
       const nowISO = APP_CONFIG.demoClockISO;
       const newAssets: Asset[] = drafts.map((d, idx) => ({
         ...d,
@@ -226,7 +213,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
         ...state,
         assets: [...newAssets, ...state.assets],
       };
-      const res = commitState(nextState);
+      const res = await commitState(nextState);
       if (!res.ok) return { ok: false, importedCount: 0, error: res.error };
       addToast({
         type: 'success',
@@ -239,100 +226,37 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const submitInspection = useCallback(
-    (params: {
-      assetId: string;
-      templateId: string;
-      inspectorId: string;
-      generalNotes: string;
-      answers: DraftAnswerMap;
-      idempotencyKey: string;
-      taskId?: string;
-    }) => {
-      const asset = state.assets.find((a) => a.id === params.assetId);
-      const template = state.templates.find((t) => t.id === params.templateId);
-      const inspector = state.members.find((m) => m.id === params.inspectorId);
-      const task = params.taskId ? state.tasks.find(t=>t.id === params.taskId) : undefined;
-      if (params.taskId && (!task || task.assetId !== params.assetId || task.templateId !== params.templateId)) return {ok:false,error:'Tarefa não encontrada para este equipamento.'};
-      if (task?.status === 'completed') {
-        const record=state.records.find(r=>r.id === task.recordId);
-        return record?{ok:true,record,createdIssuesCount:0}:{ok:false,error:'Esta tarefa já foi concluída.'};
+    async (params: InspectionSubmissionInput) => {
+      const result = await persistInspection(
+        params,
+        demoSettings.activeDemoRole,
+        demoSettings.simulateStorageError,
+      );
+      if (result.ok && result.state) {
+        setState(result.state);
+        addToast({
+          type: result.alreadyCompleted ? 'info' : 'success',
+          title: result.alreadyCompleted
+            ? 'Tarefa já concluída em outra aba'
+            : 'Inspeção concluída e registrada',
+        });
       }
-      if (!asset || !template || !inspector) {
-        return {
-          ok: false,
-          error: 'Dados de equipamento, modelo ou inspetor não encontrados.',
-        };
-      }
-
-      if (demoSettings.activeDemoRole === 'viewer' || asset.operationalStatus === 'inactive') return {ok:false,error:'Este equipamento ou perfil permite apenas consulta.'};
-      const invalid=validateInspectionDraft(template,params.answers);
-      if (invalid.length) return {ok:false,error:invalid[0].message};
-
-      // Use real time component on the demo date for clear chronological ordering within the same day
-      const now = new Date();
-      const hh = String(now.getHours()).padStart(2, '0');
-      const mm = String(now.getMinutes()).padStart(2, '0');
-      const ss = String(now.getSeconds()).padStart(2, '0');
-      const submittedAtISO = `${APP_CONFIG.demoClockDate}T${hh}:${mm}:${ss}-03:00`;
-
-      const submission = buildInspectionSubmission({
-        asset,
-        template,
-        answers: params.answers,
-        inspector,
-        generalNotes: params.generalNotes,
-        submittedAtISO,
-        idempotencyKey: params.idempotencyKey,
-        existingRecords: state.records,
-        existingIssues: state.issues,
-      });
-
-      if (submission.duplicateOf) {
-        return {
-          ok: true,
-          record: submission.duplicateOf,
-          createdIssuesCount: 0,
-        };
-      }
-
-      if (!submission.result) {
-        return { ok: false, error: 'Erro ao processar inspeção.' };
-      }
-
-      const { record, updatedAsset, createdIssues } = submission.result;
-      record.taskId=task?.id;
-      const nextState: AppStateData = {
-        ...state,
-        assets: state.assets.map((a) => (a.id === updatedAsset.id ? updatedAsset : a)),
-        records: [record, ...state.records],
-        issues: [...createdIssues, ...state.issues],
-        tasks: state.tasks.map(t=>t.id === task?.id ? {...t,status:'completed',completedAt:submittedAtISO,recordId:record.id}:t),
-      };
-
-      const res = commitState(nextState);
-      if (!res.ok) return { ok: false, error: res.error };
-
-      addToast({
-        type: createdIssues.length > 0 ? 'info' : 'success',
-        title: 'Inspeção concluída e registrada',
-        description:
-          createdIssues.length > 0
-            ? `${createdIssues.length} pendência(s) aberta(s) automaticamente.`
-            : 'Todos os itens verificados estão em conformidade.',
-      });
-
-      return {
-        ok: true,
-        record,
-        createdIssuesCount: createdIssues.length,
-      };
+      return result;
     },
-    [state, commitState, addToast, demoSettings.activeDemoRole],
+    [demoSettings.activeDemoRole, demoSettings.simulateStorageError, addToast],
   );
 
   const applyTemplateToCategory = useCallback(
-    (templateId: string, category: string) => {
-      if (demoSettings.activeDemoRole !== 'admin' || !state.templates.some(t=>t.id === templateId)) return {ok:false,updatedCount:0,error:'Selecione um modelo publicado com perfil de administrador.'};
+    async (templateId: string, category: string) => {
+      if (
+        demoSettings.activeDemoRole !== 'admin' ||
+        !state.templates.some((t) => t.id === templateId)
+      )
+        return {
+          ok: false,
+          updatedCount: 0,
+          error: 'Selecione um modelo publicado com perfil de administrador.',
+        };
       let updatedCount = 0;
       const nextAssets = state.assets.map((a) => {
         if (category === 'all' || a.category === category) {
@@ -341,7 +265,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
         }
         return a;
       });
-      const res = commitState({ ...state, assets: nextAssets });
+      const res = await commitState({ ...state, assets: nextAssets });
       if (!res.ok) return { ok: false, updatedCount: 0, error: res.error };
       addToast({
         type: 'success',
@@ -354,8 +278,8 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const updateCompany = useCallback(
-    (company: CompanyProfile) => {
-      const res = commitState({ ...state, company });
+    async (company: CompanyProfile) => {
+      const res = await commitState({ ...state, company });
       if (!res.ok) return { ok: false, error: res.error };
       addToast({
         type: 'success',
@@ -367,12 +291,12 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const addMember = useCallback(
-    (member: Omit<Member, 'id'>) => {
+    async (member: Omit<Member, 'id'>) => {
       const newMember: Member = {
         ...member,
         id: `mem-${Date.now().toString(36)}`,
       };
-      const res = commitState({
+      const res = await commitState({
         ...state,
         members: [...state.members, newMember],
       });
@@ -388,11 +312,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const updateMember = useCallback(
-    (memberId: string, patch: Partial<Member>) => {
-      const nextMembers = state.members.map((m) =>
-        m.id === memberId ? { ...m, ...patch } : m,
-      );
-      const res = commitState({ ...state, members: nextMembers });
+    async (memberId: string, patch: Partial<Member>) => {
+      const nextMembers = state.members.map((m) => (m.id === memberId ? { ...m, ...patch } : m));
+      const res = await commitState({ ...state, members: nextMembers });
       if (!res.ok) return { ok: false, error: res.error };
       addToast({
         type: 'success',
@@ -403,9 +325,13 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
     [state, commitState, addToast],
   );
 
-  const resetDemoData = useCallback(() => {
-    const fresh = resetAppStateStorage();
-    setState(fresh);
+  const resetDemoData = useCallback(async () => {
+    const result = await resetAppStateStorage();
+    if (!result.ok || !result.data) {
+      addToast({ type: 'error', title: 'Falha ao restaurar dados', description: result.error });
+      return;
+    }
+    setState(result.data);
     setDemoSettings({
       simulateLoading: false,
       simulateEmptyState: false,
@@ -445,7 +371,10 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
     [effectiveState],
   );
 
-  const operations=useMemo(()=>createOperationsActions(state,commitState,demoSettings.activeDemoRole,addToast),[state,commitState,demoSettings.activeDemoRole,addToast]);
+  const operations = useMemo(
+    () => createOperationsActions(state, commitState, demoSettings.activeDemoRole, addToast),
+    [state, commitState, demoSettings.activeDemoRole, addToast],
+  );
 
   return (
     <AppStateContext.Provider

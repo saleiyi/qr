@@ -28,9 +28,7 @@ export function InspectionReport({
           <p className="text-xs font-semibold text-[#526980]">
             Relatório de inspeções de equipamentos · {APP_CONFIG.demoLabel}
           </p>
-          <h3 className="mt-1 break-words text-xl font-bold text-[#17324D]">
-            {company.name}
-          </h3>
+          <h3 className="mt-1 break-words text-xl font-bold text-[#17324D]">{company.name}</h3>
           <p className="text-xs text-[#476078]">
             CNPJ {company.cnpj} · {company.city}
           </p>
@@ -67,7 +65,9 @@ export function InspectionReport({
                   </p>
                 </div>
                 <div className="text-[#476078] sm:text-right">
-                  <p className={`font-semibold ${record.overallResult === 'approved' ? 'text-[#137333]' : 'text-[#B42318]'}`}>
+                  <p
+                    className={`font-semibold ${record.overallResult === 'approved' ? 'text-[#137333]' : 'text-[#B42318]'}`}
+                  >
                     {record.overallResult === 'approved'
                       ? 'Aprovada'
                       : `Com pendências (${record.nonConformingCount})`}
@@ -89,20 +89,29 @@ export function InspectionReport({
 
               <div className="mt-3 space-y-2">
                 {record.answers.map((answer) => (
-                  <section key={answer.itemId} className="report-answer rounded-lg border border-[#DCE4EC] p-3">
+                  <section
+                    key={answer.itemId}
+                    className="report-answer rounded-lg border border-[#DCE4EC] p-3"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <p className="min-w-0 break-words font-medium leading-relaxed text-[#17324D]">
                         {answer.label}
-                        {answer.numericValue ? ` (${answer.numericValue} ${answer.unit ?? ''})` : ''}
-                        {answer.value ? `: ${answer.type === 'date'?formatDateBR(answer.value):answer.value}` : ''}
+                        {answer.numericValue
+                          ? ` (${answer.numericValue} ${answer.unit ?? ''})`
+                          : ''}
+                        {answer.value
+                          ? `: ${answer.type === 'date' ? formatDateBR(answer.value) : answer.value}`
+                          : ''}
                       </p>
-                      <span className={`shrink-0 font-semibold ${
-                        answer.status === 'conforming'
-                          ? 'text-[#137333]'
-                          : answer.status === 'non_conforming'
-                            ? 'text-[#B42318]'
-                            : 'text-[#526980]'
-                      }`}>
+                      <span
+                        className={`shrink-0 font-semibold ${
+                          answer.status === 'conforming'
+                            ? 'text-[#137333]'
+                            : answer.status === 'non_conforming'
+                              ? 'text-[#B42318]'
+                              : 'text-[#526980]'
+                        }`}
+                      >
                         {answer.status === 'conforming'
                           ? 'Conforme'
                           : answer.status === 'non_conforming'
@@ -137,26 +146,74 @@ export function InspectionReport({
                 <section className="mt-3 space-y-2 border-t border-[#DCE4EC] pt-3">
                   <h5 className="font-semibold text-[#17324D]">Tratamento das pendências</h5>
                   {relatedIssues.map((issue) => (
-                    <div key={issue.id} className="report-answer break-words leading-relaxed text-[#476078]">
+                    <div
+                      key={issue.id}
+                      className="report-answer break-words leading-relaxed text-[#476078]"
+                    >
                       <p>
                         <strong>
                           {issue.status === 'resolved'
                             ? 'Resolvida'
                             : issue.status === 'awaiting_review'
                               ? 'Aguardando verificação'
-                            : issue.status === 'in_progress'
-                              ? 'Em tratamento'
-                              : 'Aberta'}:
+                              : issue.status === 'in_progress'
+                                ? 'Em tratamento'
+                                : 'Aberta'}
+                          :
                         </strong>{' '}
                         {issue.description}
                       </p>
                       {issue.resolutionNote && (
-                        <p className="mt-1 whitespace-pre-wrap">Tratamento: {issue.resolutionNote}</p>
+                        <p className="mt-1 whitespace-pre-wrap">
+                          Tratamento: {issue.resolutionNote}
+                        </p>
                       )}
                       {issue.resolvedAt && (
-                        <p className="mt-1 text-[11px]">Concluída em {formatDateTimeBR(issue.resolvedAt)}</p>
+                        <p className="mt-1 text-[11px]">
+                          Concluída em {formatDateTimeBR(issue.resolvedAt)}
+                        </p>
                       )}
-                      {issue.treatmentPhotoDataUrl && <figure className="mt-2"><img src={issue.treatmentPhotoDataUrl} alt={`Tratamento: ${issue.title}`} className="max-h-64 max-w-full rounded-md object-contain" /><figcaption className="mt-1 text-[11px]">Evidência do tratamento</figcaption></figure>}
+                      {issue.treatmentPhotoDataUrl &&
+                        !issue.timeline?.some(
+                          (event) => event.photoDataUrl === issue.treatmentPhotoDataUrl,
+                        ) && (
+                          <figure className="mt-2">
+                            <img
+                              src={issue.treatmentPhotoDataUrl}
+                              alt={`Tratamento: ${issue.title}`}
+                              className="max-h-64 max-w-full rounded-md object-contain"
+                            />
+                            <figcaption className="mt-1 text-[11px]">
+                              Evidência do tratamento
+                            </figcaption>
+                          </figure>
+                        )}
+                      {issue.timeline?.map((event) => (
+                        <div key={event.id} className="mt-2 border-l border-[#DCE4EC] pl-2">
+                          <p className="font-semibold">
+                            {event.label} · {formatDateTimeBR(event.at)}
+                          </p>
+                          {event.note && <p className="mt-1 whitespace-pre-wrap">{event.note}</p>}
+                          {event.assigneeId && (
+                            <p className="mt-1">
+                              Responsável: {event.assigneeName ?? event.assigneeId} · Prazo:{' '}
+                              {formatDateBR(event.dueDate)}
+                            </p>
+                          )}
+                          {event.photoDataUrl && (
+                            <figure className="mt-2">
+                              <img
+                                src={event.photoDataUrl}
+                                alt={`Evidência: ${event.label}`}
+                                className="max-h-64 max-w-full rounded-md object-contain"
+                              />
+                              <figcaption className="mt-1 text-[11px]">
+                                {event.photoName ?? 'Evidência do tratamento'}
+                              </figcaption>
+                            </figure>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </section>

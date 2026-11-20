@@ -94,10 +94,10 @@ export function RepairRequestForm() {
             </div>
             <form
               className="space-y-5 rounded-2xl border border-[#DCE4EC] bg-white p-5"
-              onSubmit={(event) => {
+              onSubmit={async (event) => {
                 event.preventDefault();
                 if (processing) return;
-                const saved = createRepairRequest(asset.id, {
+                const saved = await createRepairRequest(asset.id, {
                   title,
                   description,
                   priority,

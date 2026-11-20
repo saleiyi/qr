@@ -82,7 +82,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ open, onClose })
     downloadTextFile('modelo_importacao_ativos.csv', '\uFEFF' + SAMPLE_IMPORT_CSV);
   };
 
-  const handleConfirmImport = () => {
+  const handleConfirmImport = async () => {
     if (!validation) return;
     const validDrafts = validation.rows
       .filter((r) => r.errors.length === 0 && r.assetDraft)
@@ -90,7 +90,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ open, onClose })
 
     if (validDrafts.length === 0) return;
 
-    const res = importAssetsBatch(validDrafts);
+    const res = await importAssetsBatch(validDrafts);
     if (res.ok) {
       setImportedCount(res.importedCount);
       setStep(3);

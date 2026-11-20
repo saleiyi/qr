@@ -30,10 +30,7 @@ export function loadAppState(): AppStateData {
   }
 }
 
-export function saveAppState(
-  data: AppStateData,
-  simulateError = false,
-): StorageResult<void> {
+export function saveAppState(data: AppStateData, simulateError = false): StorageResult<void> {
   if (simulateError) {
     return {
       ok: false,
@@ -46,8 +43,7 @@ export function saveAppState(
     return { ok: true };
   } catch (err) {
     const isQuota =
-      err instanceof DOMException &&
-      (err.name === 'QuotaExceededError' || err.code === 22);
+      err instanceof DOMException && (err.name === 'QuotaExceededError' || err.code === 22);
     return {
       ok: false,
       error: isQuota
@@ -57,9 +53,47 @@ export function saveAppState(
   }
 }
 
-export function resetAppStateStorage(): AppStateData {
-  const seed = createInitialSeedData();
+export async function transactAppState<T>(
+  change: (current: AppStateData) => { next?: AppStateData; value: T },
+  simulateError = false,
+  expectedRevision?: { value: string | undefined },
+): Promise<StorageResult<T> & { state?: AppStateData }> {
+  // Every writer cooperates on the same origin-wide lock; no read/write gap spans an await.
+  if (!navigator.locks)
+    return {
+      ok: false,
+      error: 'Abra a demonstração em HTTPS ou localhost para salvar com segurança entre abas.',
+    };
   try {
+    return await navigator.locks.request(STORAGE_KEY, () => {
+      const current = loadAppState();
+      if (expectedRevision && current.revision !== expectedRevision.value) {
+        return {
+          ok: false,
+          error:
+            'Outra aba atualizou os dados. Nada foi sobrescrito. Mantenha esta tela aberta e copie suas alterações antes de reabrir a página.',
+        };
+      }
+      const result = change(current);
+      if (!result.next) return { ok: true, data: result.value, state: current };
+      const next = { ...result.next, revision: crypto.randomUUID() };
+      const saved = saveAppState(next, simulateError);
+      return saved.ok
+        ? { ok: true, data: result.value, state: next }
+        : { ok: false, error: saved.error };
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Não foi possível salvar os dados.',
+    };
+  }
+}
+
+export async function resetAppStateStorage(): Promise<StorageResult<AppStateData>> {
+  const seed = createInitialSeedData();
+  const saved = await transactAppState(() => ({ next: seed, value: seed }));
+  if (saved.ok) {
     // Clear drafts as well
     const keysToRemove: string[] = [];
     for (let i = 0; i < window.localStorage.length; i++) {
@@ -69,16 +103,16 @@ export function resetAppStateStorage(): AppStateData {
       }
     }
     keysToRemove.forEach((k) => window.localStorage.removeItem(k));
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
-  } catch {
-    // ignore storage errors on reset
+    return { ok: true, data: saved.state };
   }
-  return seed;
+  return { ok: false, error: saved.error };
 }
 
 export function loadInspectionDraft(assetId: string, taskId?: string): InspectionDraft | null {
   try {
-    const raw = window.localStorage.getItem(`${DRAFT_PREFIX}${assetId}${taskId ? `:${taskId}` : ''}`);
+    const raw = window.localStorage.getItem(
+      `${DRAFT_PREFIX}${assetId}${taskId ? `:${taskId}` : ''}`,
+    );
     if (!raw) return null;
     return JSON.parse(raw) as InspectionDraft;
   } catch {
@@ -97,6 +131,17 @@ export function saveInspectionDraft(
     };
   }
   try {
+    const existing = loadInspectionDraft(draft.assetId, draft.taskId);
+    if (
+      existing &&
+      (existing.templateId !== draft.templateId ||
+        (existing.templateVersion ?? 1) !== (draft.templateVersion ?? 1) ||
+        (existing.questionSnapshot &&
+          JSON.stringify(existing.questionSnapshot) !== JSON.stringify(draft.questionSnapshot)))
+    ) {
+      const archiveKey = `${DRAFT_PREFIX}archive:${draft.assetId}:${draft.taskId ?? 'adhoc'}:${existing.templateId}:${existing.updatedAt}`;
+      window.localStorage.setItem(archiveKey, JSON.stringify(existing));
+    }
     window.localStorage.setItem(
       `${DRAFT_PREFIX}${draft.assetId}${draft.taskId ? `:${draft.taskId}` : ''}`,
       JSON.stringify(draft),
@@ -108,6 +153,21 @@ export function saveInspectionDraft(
       error: 'Espaço insuficiente no navegador para salvar o rascunho com anexos.',
     };
   }
+}
+
+export function loadArchivedDrafts(assetId: string, taskId?: string): InspectionDraft[] {
+  const drafts: InspectionDraft[] = [];
+  try {
+    for (let index = 0; index < localStorage.length; index++) {
+      const key = localStorage.key(index);
+      if (!key?.startsWith(`${DRAFT_PREFIX}archive:`)) continue;
+      const value = JSON.parse(localStorage.getItem(key)!) as InspectionDraft;
+      if (value.assetId === assetId && value.taskId === taskId) drafts.push(value);
+    }
+  } catch {
+    /* A failed recovery read does not overwrite the current draft. */
+  }
+  return drafts.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export function clearInspectionDraft(assetId: string, taskId?: string): void {

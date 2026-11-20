@@ -34,9 +34,9 @@ export const SettingsPage: React.FC = () => {
 
   const isViewer = demoSettings.activeDemoRole === 'viewer';
 
-  const handleSaveCompany = (e: React.FormEvent) => {
+  const handleSaveCompany = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateCompany({
+    await updateCompany({
       name: companyName.trim() || state.company.name,
       tradeName: tradeName.trim() || state.company.tradeName,
       cnpj: cnpj.trim(),
@@ -45,14 +45,14 @@ export const SettingsPage: React.FC = () => {
     });
   };
 
-  const handleAddMember = (e: React.FormEvent) => {
+  const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || !newEmail.trim()) {
       setMemberError('Informe o nome completo e o e-mail do membro.');
       return;
     }
     setMemberError(null);
-    const res = addMember({
+    const res = await addMember({
       name: newName.trim(),
       jobTitle: newJobTitle.trim() || 'Técnico de Manutenção',
       email: newEmail.trim(),
@@ -392,8 +392,8 @@ export const SettingsPage: React.FC = () => {
         confirmLabel="Confirmar restauração"
         cancelLabel="Cancelar"
         tone="danger"
-        onConfirm={() => {
-          resetDemoData();
+        onConfirm={async () => {
+          await resetDemoData();
           setConfirmResetOpen(false);
         }}
         onCancel={() => setConfirmResetOpen(false)}

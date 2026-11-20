@@ -27,3 +27,13 @@ Preserve storage failure behavior, drafts, native modal focus, Portuguese naming
 nav routes and printed evidence. New pages fit 375/768/1440px. Keep the navy/green
 industrial identity; use an agenda for work, a board for status, and a phone-sized
 preview for checklists. No decorative charts or fictitious external notifications.
+
+Review hardening: browser writes cooperate through an origin-wide lock. Task
+submission reads current persisted state inside that lock and returns the first
+record for an already-completed task. Other stale writes reject without clearing
+input. Saving requires HTTPS or localhost with Web Locks. Inspection drafts retain
+question snapshots, reconcile changed questions and archive prior answers/photos
+before replacement. Viewers never mount draft editing. Each treatment event owns
+its evidence; assignment events own their technician, deadline and priority.
+Plan creation and reload use the previous30/next90-day window while preserving all
+existing instances; errors surface in the agenda and dirty plan forms block exits.

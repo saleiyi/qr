@@ -2,6 +2,36 @@ import type { ChecklistTemplate, TemplateItem, InspectionDraft } from '../types/
 
 export type Answer = InspectionDraft['answers'][string];
 
+export function reconcileInspectionDraft(
+  saved: InspectionDraft,
+  template: ChecklistTemplate,
+): { answers: Record<string, Answer>; changed: boolean } {
+  if (saved.templateId !== template.id) return { answers: {}, changed: true };
+  if (!saved.questionSnapshot)
+    return (saved.templateVersion ?? 1) === (template.version ?? 1)
+      ? { answers: saved.answers, changed: false }
+      : { answers: {}, changed: true };
+  const safe = new Set<string>();
+  const answers: Record<string, Answer> = {};
+  for (const question of template.items) {
+    const original = saved.questionSnapshot.find((item) => item.id === question.id);
+    if (
+      original &&
+      JSON.stringify(original) === JSON.stringify(question) &&
+      (!question.visibleWhen || safe.has(question.visibleWhen.itemId))
+    ) {
+      safe.add(question.id);
+      if (saved.answers[question.id]) answers[question.id] = saved.answers[question.id];
+    }
+  }
+  return {
+    answers,
+    changed:
+      (saved.templateVersion ?? 1) !== (template.version ?? 1) ||
+      JSON.stringify(answers) !== JSON.stringify(saved.answers),
+  };
+}
+
 export function effectiveAnswer(item: TemplateItem, answer: Answer = {}): Answer {
   if (item.type === 'single_choice' || item.type === 'date') {
     return { ...answer, status: answer.value ? 'conforming' : undefined };

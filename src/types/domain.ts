@@ -165,6 +165,12 @@ export interface IssueEvent {
   actorId: string;
   label: string;
   note?: string;
+  photoDataUrl?: string;
+  photoName?: string;
+  assigneeId?: string;
+  assigneeName?: string;
+  dueDate?: string;
+  priority?: IssuePriority;
 }
 
 export interface InspectionPlan {
@@ -195,6 +201,8 @@ export interface InspectionDraft {
   assetId: string;
   taskId?: string;
   templateId: string;
+  templateVersion?: number;
+  questionSnapshot?: TemplateItem[];
   inspectorId: string;
   generalNotes: string;
   updatedAt: string;
@@ -227,6 +235,8 @@ export interface DemoSettings {
 }
 
 export interface AppStateData {
+  revision?: string;
+  scheduleWarnings?: string[];
   company: CompanyProfile;
   sites: Site[];
   members: Member[];

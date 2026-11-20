@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useBeforeUnload, useBlocker, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import {
+  Link,
+  useBeforeUnload,
+  useBlocker,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 import {
   AlertCircle,
   ArrowLeft,
@@ -20,107 +27,144 @@ import type {
 import {
   clearInspectionDraft,
   loadInspectionDraft,
+  loadArchivedDrafts,
   processImageUpload,
   saveInspectionDraft,
 } from '../services/storageAdapter';
-import {
-  validateInspectionDraft,
-  type DraftAnswerMap,
-} from '../utils/domainLogic';
+import { validateInspectionDraft, type DraftAnswerMap } from '../utils/domainLogic';
 import { formatDateTimeBR } from '../utils/date';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ChecklistFields } from '../components/ChecklistFields';
-import { effectiveAnswer, visibleItems } from '../utils/checklist';
+import { effectiveAnswer, visibleItems, reconcileInspectionDraft } from '../utils/checklist';
+import { DraftDownload, DraftRecovery } from '../components/DraftRecovery';
+import { FormError } from '../components/OperationsUI';
 
 function fingerprintDraft(draft: Omit<InspectionDraft, 'updatedAt'>): string {
   return JSON.stringify({
     assetId: draft.assetId,
     taskId: draft.taskId,
     templateId: draft.templateId,
+    templateVersion: draft.templateVersion ?? 1,
     inspectorId: draft.inspectorId,
     generalNotes: draft.generalNotes,
     answers: draft.answers,
   });
 }
 
-export const InspectionFormPage: React.FC = () => {
+const EditableInspectionFormPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { state, demoSettings, submitInspection, addToast } = useAppState();
-  const [searchParams]=useSearchParams();
-  const taskId=searchParams.get('taskId') ?? undefined;
-  const task=state.tasks.find(t=>t.id === taskId && t.assetId === id);
+  const [searchParams] = useSearchParams();
+  const taskId = searchParams.get('taskId') ?? undefined;
+  const task = state.tasks.find((t) => t.id === taskId && t.assetId === id);
 
   const asset = state.assets.find((a) => a.id === id);
   const template = asset
-    ? state.templates.find((t) => t.id === (task?.templateId ?? asset.templateId)) ?? state.templates[0]
+    ? (state.templates.find((t) => t.id === (task?.templateId ?? asset.templateId)) ??
+      state.templates[0])
     : undefined;
 
   const activeInspectors = state.members.filter(
     (m) => m.status === 'active' && m.role !== 'viewer',
   );
-  const defaultInspectorId = task?.assigneeId ?? activeInspectors[0]?.id ?? state.members[0]?.id ?? '';
+  const defaultInspectorId =
+    task?.assigneeId ?? activeInspectors[0]?.id ?? state.members[0]?.id ?? '';
 
   const [inspectorId, setInspectorId] = useState(defaultInspectorId);
   const [generalNotes, setGeneralNotes] = useState('');
   const [answers, setAnswers] = useState<DraftAnswerMap>({});
+  const [recoveryDrafts, setRecoveryDrafts] = useState<InspectionDraft[]>([]);
+  const [loadedDraft, setLoadedDraft] = useState<InspectionDraft | null>(null);
   const [itemErrors, setItemErrors] = useState<Record<string, string>>({});
   const [photoErrors, setPhotoErrors] = useState<Record<string, string>>({});
   const [pendingPhotoCount, setPendingPhotoCount] = useState(0);
-  const [draftRestoredNotice, setDraftRestoredNotice] = useState<string | null>(
-    null,
-  );
+  const [draftRestoredNotice, setDraftRestoredNotice] = useState<string | null>(null);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [lastSavedFingerprint, setLastSavedFingerprint] = useState<string | null>(null);
-  const [draftSaveState, setDraftSaveState] = useState<'idle' | 'processing' | 'saving' | 'saved' | 'error'>('idle');
+  const [draftSaveState, setDraftSaveState] = useState<
+    'idle' | 'processing' | 'saving' | 'saved' | 'error'
+  >('idle');
   const [draftSaveError, setDraftSaveError] = useState<string | null>(null);
   const allowLeaveRef = useRef(false);
   const [submittedResult, setSubmittedResult] = useState<{
     record: InspectionRecord;
     createdIssuesCount: number;
+    alreadyCompleted?: boolean;
   } | null>(null);
 
   const idempotencyKeyRef = useRef<string>(
     `sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   );
 
-  const draftValues = useMemo(() => ({
-    assetId: asset?.id ?? '',
-    taskId,
-    templateId: template?.id ?? '',
-    inspectorId,
-    generalNotes,
-    answers,
-  }), [asset?.id, taskId, template?.id, inspectorId, generalNotes, answers]);
+  const draftValues = useMemo(
+    () => ({
+      assetId: asset?.id ?? '',
+      taskId,
+      templateId: template?.id ?? '',
+      templateVersion: template?.version ?? 1,
+      questionSnapshot: template?.items ?? [],
+      inspectorId,
+      generalNotes,
+      answers,
+    }),
+    [
+      asset?.id,
+      taskId,
+      template?.id,
+      template?.version,
+      template?.items,
+      inspectorId,
+      generalNotes,
+      answers,
+    ],
+  );
   const currentFingerprint = useMemo(() => fingerprintDraft(draftValues), [draftValues]);
-  const initialFingerprint = useMemo(() => fingerprintDraft({
-    assetId: asset?.id ?? '',
-    taskId,
-    templateId: template?.id ?? '',
-    inspectorId: defaultInspectorId,
-    generalNotes: '',
-    answers: {},
-  }), [asset?.id, taskId, template?.id, defaultInspectorId]);
+  const initialFingerprint = useMemo(
+    () =>
+      fingerprintDraft({
+        assetId: asset?.id ?? '',
+        taskId,
+        templateId: template?.id ?? '',
+        templateVersion: template?.version ?? 1,
+        inspectorId: defaultInspectorId,
+        generalNotes: '',
+        answers: {},
+      }),
+    [asset?.id, taskId, template?.id, template?.version, defaultInspectorId],
+  );
   const hasPendingPhotos = pendingPhotoCount > 0;
   const hasUnsavedChanges = Boolean(
-    asset && template && !submittedResult &&
+    asset &&
+    template &&
+    !submittedResult &&
     (hasPendingPhotos || currentFingerprint !== (lastSavedFingerprint ?? initialFingerprint)),
   );
 
-  const blocker = useBlocker(useCallback(
-    ({ currentLocation, nextLocation }) =>
-      hasUnsavedChanges && !allowLeaveRef.current &&
-      currentLocation.pathname+currentLocation.search !== nextLocation.pathname+nextLocation.search,
-    [hasUnsavedChanges],
-  ));
+  const blocker = useBlocker(
+    useCallback(
+      ({ currentLocation, nextLocation }) =>
+        hasUnsavedChanges &&
+        !allowLeaveRef.current &&
+        currentLocation.pathname + currentLocation.search !==
+          nextLocation.pathname + nextLocation.search,
+      [hasUnsavedChanges],
+    ),
+  );
 
-  useBeforeUnload(useCallback((event) => {
-    if (hasUnsavedChanges && !allowLeaveRef.current) {
-      event.preventDefault();
-      event.returnValue = '';
-    }
-  }, [hasUnsavedChanges]));
+  useBeforeUnload(
+    useCallback(
+      (event) => {
+        if (hasUnsavedChanges && !allowLeaveRef.current) {
+          event.preventDefault();
+          event.returnValue = '';
+        }
+      },
+      [hasUnsavedChanges],
+    ),
+  );
 
   useEffect(() => {
     if (blocker.state === 'blocked' && !hasUnsavedChanges) blocker.proceed();
@@ -128,10 +172,19 @@ export const InspectionFormPage: React.FC = () => {
 
   // Restore saved draft if present (and never preselect "Conforme")
   useEffect(() => {
-    if (!asset) return;
-    const saved = loadInspectionDraft(asset.id,taskId);
+    if (!asset || !template) return;
+    const saved = loadInspectionDraft(asset.id, taskId);
+    const archived = loadArchivedDrafts(asset.id, taskId);
+    setRecoveryDrafts(archived);
     if (saved) {
-      setAnswers(saved.answers ?? {});
+      const restored = reconcileInspectionDraft(saved, template);
+      setLoadedDraft(saved);
+      setAnswers(restored.answers);
+      if (restored.changed)
+        setRecoveryDrafts([
+          saved,
+          ...archived.filter((draft) => draft.updatedAt !== saved.updatedAt),
+        ]);
       setGeneralNotes(saved.generalNotes ?? '');
       if (saved.inspectorId) setInspectorId(saved.inspectorId);
       setLastSavedFingerprint(fingerprintDraft(saved));
@@ -140,7 +193,7 @@ export const InspectionFormPage: React.FC = () => {
         `Rascunho recuperado (salvo em ${formatDateTimeBR(saved.updatedAt)}).`,
       );
     }
-  }, [asset?.id,taskId]);
+  }, [asset?.id, taskId, template?.id, template?.version]);
 
   const persistDraft = useCallback(() => {
     const result = saveInspectionDraft(
@@ -176,9 +229,7 @@ export const InspectionFormPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-[#F4F7FA] p-6 text-center">
         <div className="mx-auto max-w-md rounded-2xl border border-[#DCE4EC] bg-white p-6">
-          <h1 className="text-lg font-bold text-[#17324D]">
-            Equipamento não encontrado
-          </h1>
+          <h1 className="text-lg font-bold text-[#17324D]">Equipamento não encontrado</h1>
           <Link
             to="/app/assets"
             className="mt-4 inline-block rounded-lg bg-[#176B5B] px-4 py-2 text-sm font-semibold text-white"
@@ -190,26 +241,45 @@ export const InspectionFormPage: React.FC = () => {
     );
   }
 
-  if (task?.status === 'completed' && !submittedResult) return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F4F7FA] p-5">
-      <section className="w-full max-w-md rounded-2xl border border-[#DCE4EC] bg-white p-6 text-center">
-        <CheckCircle2 className="mx-auto h-10 w-10 text-[#176B5B]" />
-        <h1 className="mt-4 text-xl font-bold">Tarefa já concluída</h1>
-        <p className="mt-2 text-sm text-[#526980]">Esta execução já possui um registro. Você pode consultar o resultado ou voltar à agenda.</p>
-        <Link to={`/app/records?recordId=${task.recordId}`} className="mt-5 block rounded-lg bg-[#176B5B] px-4 py-3 font-semibold text-white">Ver registro</Link>
-        <Link to="/app/plans" className="mt-3 block p-2 text-sm font-semibold text-[#176B5B]">Voltar à agenda</Link>
-      </section>
-    </main>
-  );
+  if (task?.status === 'completed' && !submittedResult)
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FA] p-5">
+        <section className="w-full max-w-md rounded-2xl border border-[#DCE4EC] bg-white p-6 text-center">
+          <CheckCircle2 className="mx-auto h-10 w-10 text-[#176B5B]" />
+          <h1 className="mt-4 text-xl font-bold">Tarefa já concluída</h1>
+          <p className="mt-2 text-sm text-[#526980]">
+            Esta execução já possui um registro. Você pode consultar o resultado ou voltar à agenda.
+          </p>
+          <DraftRecovery
+            drafts={
+              loadedDraft
+                ? [
+                    loadedDraft,
+                    ...recoveryDrafts.filter((draft) => draft.updatedAt !== loadedDraft.updatedAt),
+                  ]
+                : recoveryDrafts
+            }
+          />
+          <Link
+            to={`/app/records?recordId=${task.recordId}`}
+            className="mt-5 block rounded-lg bg-[#176B5B] px-4 py-3 font-semibold text-white"
+          >
+            Ver registro
+          </Link>
+          <Link to="/app/plans" className="mt-3 block p-2 text-sm font-semibold text-[#176B5B]">
+            Voltar à agenda
+          </Link>
+        </section>
+      </main>
+    );
 
   const visible = visibleItems(template, answers);
   const totalItems = visible.length;
-  const answeredCount = visible.filter(
-    (item) => Boolean(effectiveAnswer(item, answers[item.id]).status),
+  const answeredCount = visible.filter((item) =>
+    Boolean(effectiveAnswer(item, answers[item.id]).status),
   ).length;
   const remainingCount = totalItems - answeredCount;
-  const progressPct =
-    totalItems > 0 ? Math.round((answeredCount / totalItems) * 100) : 0;
+  const progressPct = totalItems > 0 ? Math.round((answeredCount / totalItems) * 100) : 0;
 
   const setItemStatus = (itemId: string, status: ChecklistAnswerValue) => {
     setAnswers((prev) => ({
@@ -227,10 +297,7 @@ export const InspectionFormPage: React.FC = () => {
     });
   };
 
-  const setItemField = (
-    itemId: string,
-    patch: Partial<DraftAnswerMap[string]>,
-  ) => {
+  const setItemField = (itemId: string, patch: Partial<DraftAnswerMap[string]>) => {
     setAnswers((prev) => ({
       ...prev,
       [itemId]: {
@@ -246,10 +313,7 @@ export const InspectionFormPage: React.FC = () => {
     });
   };
 
-  const handlePhotoUpload = async (
-    itemId: string,
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
+  const handlePhotoUpload = async (itemId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setPhotoErrors((prev) => ({ ...prev, [itemId]: '' }));
@@ -297,12 +361,12 @@ export const InspectionFormPage: React.FC = () => {
 
   const handleDiscardDraft = () => {
     allowLeaveRef.current = true;
-    clearInspectionDraft(asset.id,taskId);
+    clearInspectionDraft(asset.id, taskId);
     setConfirmDiscardOpen(false);
-    navigate(taskId?'/app/plans':`/a/${asset.id}`);
+    navigate(taskId ? '/app/plans' : `/a/${asset.id}`);
   };
 
-  const handleSubmitInspection = (e: React.FormEvent) => {
+  const handleSubmitInspection = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting || submittedResult || hasPendingPhotos) return;
 
@@ -326,9 +390,11 @@ export const InspectionFormPage: React.FC = () => {
     }
 
     setIsSubmitting(true);
-    const res = submitInspection({
+    setSubmissionError(null);
+    const res = await submitInspection({
       assetId: asset.id,
       templateId: template.id,
+      templateVersion: template.version ?? 1,
       inspectorId,
       generalNotes,
       answers,
@@ -338,6 +404,7 @@ export const InspectionFormPage: React.FC = () => {
     setIsSubmitting(false);
 
     if (!res.ok || !res.record) {
+      setSubmissionError(res.error ?? 'Não foi possível finalizar a inspeção.');
       addToast({
         type: 'error',
         title: 'Não foi possível finalizar a inspeção',
@@ -346,10 +413,13 @@ export const InspectionFormPage: React.FC = () => {
       return;
     }
 
-    clearInspectionDraft(asset.id,taskId);
+    if (res.alreadyCompleted)
+      saveInspectionDraft({ ...draftValues, updatedAt: new Date().toISOString() });
+    else clearInspectionDraft(asset.id, taskId);
     setSubmittedResult({
       record: res.record,
       createdIssuesCount: res.createdIssuesCount ?? 0,
+      alreadyCompleted: res.alreadyCompleted,
     });
   };
 
@@ -370,7 +440,7 @@ export const InspectionFormPage: React.FC = () => {
             </div>
             <div>
               <h1 className="text-lg font-bold text-[#17324D]">
-                Inspeção finalizada
+                {submittedResult.alreadyCompleted ? 'Tarefa já concluída' : 'Inspeção finalizada'}
               </h1>
               <p className="text-xs text-[#526980]">
                 Registro {record.id} · {formatDateTimeBR(record.submittedAt)}
@@ -382,12 +452,8 @@ export const InspectionFormPage: React.FC = () => {
             <p className="font-mono text-xs font-semibold text-[#17324D]">
               {record.assetCodeSnapshot}
             </p>
-            <p className="font-semibold text-[#17324D]">
-              {record.assetNameSnapshot}
-            </p>
-            <p className="mt-1 text-xs text-[#476078]">
-              Inspetor: {record.inspectorNameSnapshot}
-            </p>
+            <p className="font-semibold text-[#17324D]">{record.assetNameSnapshot}</p>
+            <p className="mt-1 text-xs text-[#476078]">Inspetor: {record.inspectorNameSnapshot}</p>
             <div className="mt-3 grid grid-cols-3 gap-2 border-t border-[#DCE4EC] pt-3 text-center text-xs tabular-nums">
               <div>
                 <p className="font-mono text-base font-bold text-[#137333]">
@@ -402,9 +468,7 @@ export const InspectionFormPage: React.FC = () => {
                 <p className="text-[#526980]">Não conformes</p>
               </div>
               <div>
-                <p className="font-mono text-base font-bold text-[#476078]">
-                  {record.naCount}
-                </p>
+                <p className="font-mono text-base font-bold text-[#476078]">{record.naCount}</p>
                 <p className="text-[#526980]">N/A</p>
               </div>
             </div>
@@ -416,14 +480,39 @@ export const InspectionFormPage: React.FC = () => {
                 {createdIssuesCount} pendência(s) aberta(s) automaticamente
               </p>
               <p className="mt-1">
-                Cada item marcado como Não conforme gerou uma pendência rastreável na lista de tratamento.
+                Cada item marcado como Não conforme gerou uma pendência rastreável na lista de
+                tratamento.
               </p>
             </div>
           )}
 
           <div className="mt-6 space-y-2.5">
-            <Link to={`/app/records?recordId=${record.id}`} className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-[#DCE4EC] bg-white px-4 text-sm font-semibold text-[#176B5B]">Ver registro completo</Link>
-            {taskId && <Link to="/app/plans" className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-[#DCE4EC] bg-white px-4 text-sm font-semibold text-[#17324D]">Voltar à agenda</Link>}
+            {submittedResult.alreadyCompleted && (
+              <div className="space-y-2 rounded-lg bg-[#FEF6EB] p-3">
+                <p className="text-xs leading-relaxed text-[#795015]">
+                  Outra aba já concluiu esta tarefa. O registro original foi preservado. Suas
+                  respostas continuam disponíveis para download.
+                </p>
+                <DraftDownload
+                  draft={{ ...draftValues, updatedAt: new Date().toISOString() }}
+                  label="Baixar minhas respostas"
+                />
+              </div>
+            )}
+            <Link
+              to={`/app/records?recordId=${record.id}`}
+              className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-[#DCE4EC] bg-white px-4 text-sm font-semibold text-[#176B5B]"
+            >
+              Ver registro completo
+            </Link>
+            {taskId && (
+              <Link
+                to="/app/plans"
+                className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-[#DCE4EC] bg-white px-4 text-sm font-semibold text-[#17324D]"
+              >
+                Voltar à agenda
+              </Link>
+            )}
             {createdIssuesCount > 0 && (
               <Link
                 to={`/app/issues?assetId=${asset.id}`}
@@ -466,9 +555,7 @@ export const InspectionFormPage: React.FC = () => {
           </button>
 
           <div className="min-w-0 text-center">
-            <p className="truncate font-mono text-xs font-bold text-[#17324D]">
-              {asset.code}
-            </p>
+            <p className="truncate font-mono text-xs font-bold text-[#17324D]">{asset.code}</p>
             <p className="truncate text-[11px] text-[#526980] tabular-nums">
               {answeredCount} de {totalItems} respondidos
             </p>
@@ -491,14 +578,14 @@ export const InspectionFormPage: React.FC = () => {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-5">
+        <FormError message={submissionError} />
+        <DraftRecovery drafts={recoveryDrafts} />
         {/* Inspection Context Card */}
         <section className="rounded-2xl border border-[#DCE4EC] bg-white p-4 sm:p-5">
           <p className="font-mono text-xs font-semibold text-[#176B5B]">
             {asset.code} · {template.name}
           </p>
-          <h1 className="mt-1 text-lg font-bold text-[#17324D]">
-            {asset.name}
-          </h1>
+          <h1 className="mt-1 text-lg font-bold text-[#17324D]">{asset.name}</h1>
 
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
@@ -560,7 +647,8 @@ export const InspectionFormPage: React.FC = () => {
               </p>
               {draftSaveState === 'error' && (
                 <p className="mt-1 text-xs leading-relaxed">
-                  {draftSaveError} Suas respostas continuam nesta tela. Salve novamente antes de sair.
+                  {draftSaveError} Suas respostas continuam nesta tela. Salve novamente antes de
+                  sair.
                 </p>
               )}
             </div>
@@ -577,14 +665,18 @@ export const InspectionFormPage: React.FC = () => {
         )}
 
         <form onSubmit={handleSubmitInspection} noValidate className="mt-5 space-y-5">
-          <ChecklistFields template={template} answers={answers} onChange={setItemField} errors={itemErrors} photoErrors={photoErrors} onPhotoUpload={handlePhotoUpload} />
+          <ChecklistFields
+            template={template}
+            answers={answers}
+            onChange={setItemField}
+            errors={itemErrors}
+            photoErrors={photoErrors}
+            onPhotoUpload={handlePhotoUpload}
+          />
 
           {/* General Notes */}
           <section className="rounded-2xl border border-[#DCE4EC] bg-white p-4 sm:p-5">
-            <label
-              htmlFor="general-notes"
-              className="block text-sm font-semibold text-[#17324D]"
-            >
+            <label htmlFor="general-notes" className="block text-sm font-semibold text-[#17324D]">
               Observações gerais da inspeção (opcional)
             </label>
             <textarea
@@ -615,9 +707,7 @@ export const InspectionFormPage: React.FC = () => {
                 className="inline-flex min-h-[44px] flex-[1.25] items-center justify-center gap-1.5 rounded-xl bg-[#176B5B] px-3.5 text-xs sm:text-sm font-semibold text-white hover:bg-[#125548] disabled:opacity-60 whitespace-nowrap"
               >
                 <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>
-                  {isSubmitting ? 'Registrando...' : 'Finalizar inspeção'}
-                </span>
+                <span>{isSubmitting ? 'Registrando...' : 'Finalizar inspeção'}</span>
               </button>
             </div>
           </div>
@@ -631,8 +721,12 @@ export const InspectionFormPage: React.FC = () => {
         confirmLabel="Sair sem salvar"
         cancelLabel="Continuar preenchendo"
         tone="danger"
-        onConfirm={() => { if (blocker.state === 'blocked') blocker.proceed(); }}
-        onCancel={() => { if (blocker.state === 'blocked') blocker.reset(); }}
+        onConfirm={() => {
+          if (blocker.state === 'blocked') blocker.proceed();
+        }}
+        onCancel={() => {
+          if (blocker.state === 'blocked') blocker.reset();
+        }}
       />
 
       <ConfirmDialog
@@ -647,4 +741,29 @@ export const InspectionFormPage: React.FC = () => {
       />
     </div>
   );
+};
+
+export const InspectionFormPage: React.FC = () => {
+  const { demoSettings, state } = useAppState();
+  const { id } = useParams();
+  const asset = state.assets.find((asset) => asset.id === id);
+  if (demoSettings.activeDemoRole === 'viewer' || asset?.operationalStatus === 'inactive')
+    return (
+      <main className="mx-auto max-w-lg space-y-4 p-6">
+        <h1 className="text-xl font-bold">Consulta de inspeção</h1>
+        <p className="text-sm leading-relaxed text-[#526980]">
+          Este perfil ou equipamento permite apenas consulta. O rascunho da operação foi preservado.
+        </p>
+        <Link
+          to="/app/plans"
+          className="block rounded-lg bg-[#176B5B] px-4 py-3 text-center font-semibold text-white"
+        >
+          Consultar agenda
+        </Link>
+        <Link to={`/a/${id}`} className="block p-2 text-center text-sm text-[#176B5B]">
+          Voltar para a ficha
+        </Link>
+      </main>
+    );
+  return <EditableInspectionFormPage />;
 };

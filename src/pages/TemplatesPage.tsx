@@ -68,7 +68,7 @@ export function TemplatesPage() {
   const [discard, setDiscard] = useState(false);
   const [applyCategory, setApplyCategory] = useState('Climatização');
   const [applyConfirm, setApplyConfirm] = useState(false);
-  const pendingAction = useRef<(() => void) | null>(null);
+  const pendingAction = useRef<(() => void | Promise<void>) | null>(null);
   const allowLeave = useRef(false);
   const canEdit = demoSettings.activeDemoRole === 'admin';
   const dirty = canEdit && Boolean(draft) && JSON.stringify(draft) !== baseline;
@@ -98,7 +98,7 @@ export function TemplatesPage() {
     } else action();
   };
   const create = (copy = false) =>
-    requestAction(() => {
+    requestAction(async () => {
       const next: ChecklistTemplate =
         copy && selected
           ? {
@@ -116,7 +116,7 @@ export function TemplatesPage() {
               updatedAt: APP_CONFIG.demoClockISO,
               items: [makeItem()],
             };
-      const result = saveTemplateDraft(next);
+      const result = await saveTemplateDraft(next);
       if (!result.ok) setError(result.error ?? 'Não foi possível criar o modelo.');
       else select(next.id);
     });
@@ -135,9 +135,9 @@ export function TemplatesPage() {
     [items[index], items[target]] = [items[target], items[index]];
     setDraft({ ...draft, items });
   };
-  const save = (publish: boolean) => {
+  const save = async (publish: boolean) => {
     if (!draft) return;
-    const result = publish ? publishTemplate(draft) : saveTemplateDraft(draft);
+    const result = await (publish ? publishTemplate(draft) : saveTemplateDraft(draft));
     if (!result.ok) setError(result.error ?? 'Não foi possível salvar o modelo.');
     else {
       setError(null);
@@ -619,13 +619,13 @@ export function TemplatesPage() {
         confirmLabel="Continuar sem salvar"
         cancelLabel="Continuar editando"
         tone="danger"
-        onConfirm={() => {
+        onConfirm={async () => {
           allowLeave.current = true;
           setDiscard(false);
           if (pendingAction.current) {
             const action = pendingAction.current;
             pendingAction.current = null;
-            action();
+            await action();
             allowLeave.current = false;
           } else if (blocker.state === 'blocked') blocker.proceed();
         }}
@@ -640,9 +640,9 @@ export function TemplatesPage() {
         title="Aplicar este modelo aos equipamentos?"
         description={`A versão publicada será vinculada a ${state.assets.filter((asset) => applyCategory === 'all' || asset.category === applyCategory).length} equipamento(s). Os registros anteriores serão preservados.`}
         confirmLabel="Confirmar aplicação"
-        onConfirm={() => {
+        onConfirm={async () => {
           if (!published) return;
-          const result = applyTemplateToCategory(published.id, applyCategory);
+          const result = await applyTemplateToCategory(published.id, applyCategory);
           if (result.ok) setApplyConfirm(false);
           else setError(result.error ?? 'Não foi possível aplicar.');
         }}

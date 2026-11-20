@@ -61,9 +61,9 @@ Files: pages/TemplatesPage.tsx, components/ChecklistPreview.tsx,
 tests/operations.spec.ts, README.md.
 Consumes separate drafts/publish APIs and checklist helpers. Published template
 versions alone are used by equipment/plans; records snapshot the version.
-- [ ] Add/run failing browser cases for draft isolation, publishing, branching,
+- [x] Add/run failing browser cases for draft isolation, publishing, branching,
   thresholds and historical snapshots; cover the five Review Focus conditions.
-- [ ] Implement creation/copy/editor, publishing validation and phone preview.
-- [ ] Run all domain/browser tests, TypeScript and build; inspect responsive shots.
-- [ ] Request one independent whole-change review, fix material findings with
+- [x] Implement creation/copy/editor, publishing validation and phone preview.
+- [x] Run all domain/browser tests, TypeScript and build; inspect responsive shots.
+- [x] Request one independent whole-change review, fix material findings with
   regressions, commit and update the reviewable branch/PR and local preview.

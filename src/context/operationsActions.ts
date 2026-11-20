@@ -9,7 +9,7 @@ import type {
 import { APP_CONFIG } from '../config/appConfig';
 import { addDaysISODate } from '../utils/date';
 import {
-  generatePlanTasks,
+  materializePlanTasks,
   transitionWorkOrder,
   type WorkOrderAction,
   type WorkOrderChange,
@@ -19,7 +19,7 @@ import { validateTemplate } from '../utils/checklist';
 type Result = { ok: boolean; error?: string };
 export function createOperationsActions(
   state: AppStateData,
-  commitState: (state: AppStateData) => Result,
+  commitState: (state: AppStateData) => Promise<Result>,
   role: UserRole,
   notify: (toast: {
     type: 'success' | 'error' | 'info';
@@ -27,9 +27,9 @@ export function createOperationsActions(
     description?: string;
   }) => void,
 ) {
-  const save = (next: AppStateData, title: string): Result => {
+  const save = async (next: AppStateData, title: string): Promise<Result> => {
     if (role === 'viewer') return { ok: false, error: 'Este perfil permite apenas consulta.' };
-    const result = commitState(next);
+    const result = await commitState(next);
     if (result.ok) notify({ type: 'success', title });
     return result;
   };
@@ -38,7 +38,7 @@ export function createOperationsActions(
     error: error instanceof Error ? error.message : 'Não foi possível salvar.',
   });
   return {
-    savePlan(draft: Omit<InspectionPlan, 'id' | 'createdAt'>) {
+    async savePlan(draft: Omit<InspectionPlan, 'id' | 'createdAt'>) {
       try {
         if (role !== 'admin') throw new Error('Somente o administrador pode criar planos.');
         if (draft.name.trim().length < 3)
@@ -63,9 +63,11 @@ export function createOperationsActions(
           id: `plan-${crypto.randomUUID()}`,
           createdAt: APP_CONFIG.demoClockISO,
         };
-        const tasks = generatePlanTasks(plan, addDaysISODate(plan.startDate, 90));
-        const result = save(
-          { ...state, plans: [plan, ...state.plans], tasks: [...state.tasks, ...tasks] },
+        if (plan.startDate > addDaysISODate(APP_CONFIG.demoClockDate, 90))
+          throw new Error('Escolha uma data inicial dentro dos próximos 90 dias.');
+        const tasks = materializePlanTasks(plan, APP_CONFIG.demoClockDate, state.tasks);
+        const result = await save(
+          { ...state, plans: [plan, ...state.plans], tasks },
           'Plano criado e tarefas programadas',
         );
         return { ...result, plan: result.ok ? plan : undefined };
@@ -73,7 +75,7 @@ export function createOperationsActions(
         return { ...failure(error), plan: undefined };
       }
     },
-    createRepairRequest(
+    async createRepairRequest(
       assetId: string,
       draft: {
         title: string;
@@ -119,10 +121,17 @@ export function createOperationsActions(
           },
         ],
       };
-      const result = save({ ...state, issues: [issue, ...state.issues] }, 'Solicitação registrada');
+      const result = await save(
+        { ...state, issues: [issue, ...state.issues] },
+        'Solicitação registrada',
+      );
       return { ...result, issue: result.ok ? issue : undefined };
     },
-    changeWorkOrder(issueId: string, action: WorkOrderAction, change: WorkOrderChange): Result {
+    async changeWorkOrder(
+      issueId: string,
+      action: WorkOrderAction,
+      change: WorkOrderChange,
+    ): Promise<Result> {
       try {
         if (role === 'viewer') throw new Error('Este perfil permite apenas consulta.');
         const actor = state.members.find(
@@ -143,8 +152,16 @@ export function createOperationsActions(
           )
         )
           throw new Error('Selecione um técnico ativo.');
-        const updated = transitionWorkOrder(issue, action, change, APP_CONFIG.demoClockISO);
-        return save(
+        const updated = transitionWorkOrder(
+          issue,
+          action,
+          {
+            ...change,
+            assigneeName: state.members.find((member) => member.id === change.assigneeId)?.name,
+          },
+          APP_CONFIG.demoClockISO,
+        );
+        return await save(
           { ...state, issues: state.issues.map((i) => (i.id === issueId ? updated : i)) },
           updated.timeline!.at(-1)!.label,
         );
@@ -152,12 +169,12 @@ export function createOperationsActions(
         return failure(error);
       }
     },
-    saveTemplateDraft(template: ChecklistTemplate): Result {
+    async saveTemplateDraft(template: ChecklistTemplate): Promise<Result> {
       if (role !== 'admin')
         return { ok: false, error: 'Somente o administrador pode editar modelos.' };
       if (!template.name.trim()) return { ok: false, error: 'Informe o nome do modelo.' };
       const draft = structuredClone({ ...template, updatedAt: APP_CONFIG.demoClockISO });
-      return save(
+      return await save(
         {
           ...state,
           templateDrafts: [draft, ...state.templateDrafts.filter((t) => t.id !== draft.id)],
@@ -165,7 +182,7 @@ export function createOperationsActions(
         'Rascunho do modelo salvo',
       );
     },
-    publishTemplate(template: ChecklistTemplate): Result {
+    async publishTemplate(template: ChecklistTemplate): Promise<Result> {
       if (role !== 'admin')
         return { ok: false, error: 'Somente o administrador pode publicar modelos.' };
       const error = validateTemplate(template);
@@ -179,7 +196,7 @@ export function createOperationsActions(
         version,
         updatedAt: APP_CONFIG.demoClockISO,
       });
-      return save(
+      return await save(
         {
           ...state,
           templates: [published, ...state.templates.filter((t) => t.id !== published.id)],

@@ -51,7 +51,9 @@ While a photo is being processed, saving and submission wait for the attachment.
 
 - `/app/plans`: daily, weekly or monthly plans for selected equipment, a published
   checklist and an inspector. Agenda and calendar show linked task executions.
-  The browser materializes a 90-day window and extends it when data loads.
+  Creation and reload use the same bounded window: the previous 30 and next 90
+  days. Existing older task instances remain available. Failed materialization is
+  reported rather than silently creating an incomplete plan.
   Month-end schedules retain their original day; completed instances are retained.
 - `/a/:id/request`: standalone QR repair requests with priority and optional photo.
   Requests enter `/app/issues` unassigned. Assign a technician and deadline, start
@@ -66,6 +68,16 @@ Scheduled inspections have separate draft keys and complete their task atomicall
 with the record. Reopening a completed task links to the saved result. Old browser
 saves retain equipment edits when the new collections are added. Existing records
 retain their question/answer snapshots; new records also retain template versions.
+
+Writes use an origin-wide browser lock. Inspection submission reads the latest
+persisted state inside the lock, so two tabs cannot replace a completed task or
+erase an unrelated request. Other stale edits are rejected while keeping input.
+Saving requires HTTPS or localhost and a browser with the Web Locks API.
+
+Inspection drafts retain question snapshots. Revised questions require new
+answers; prior drafts are archived before replacement and can be downloaded with
+their photos. Treatment events retain each submission's evidence and assignment
+events retain their technician, deadline and priority.
 
 The profile switch demonstrates administrator/operator/viewer interfaces within
 the current app session. It provides no real authentication or access security.
