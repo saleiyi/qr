@@ -1,0 +1,8 @@
+{
+  "name": "Ativos — Gestão de Equipamentos e Inspeções",
+  "description": "Protótipo interativo de gestão de equipamentos, etiquetas QR, inspeções em campo e tratamento de pendências para equipes de manutenção.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
