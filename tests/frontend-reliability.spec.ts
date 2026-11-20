@@ -312,8 +312,10 @@ test('workflow submits inspection evidence and records issue treatment', async (
   await page.getByRole('searchbox', { name: 'Buscar pendências' }).fill('Filtro de teste saturado.');
   await page.getByRole('button', { name: 'Tratar', exact: true }).click();
   const issue = page.getByRole('dialog');
+  await issue.getByRole('button', { name: 'Iniciar atendimento', exact: true }).click();
   await issue.getByLabel('Resultado do tratamento e ação corretiva *').fill('Filtro substituído e operação verificada no local.');
-  await issue.getByRole('button', { name: 'Concluir e fechar pendência' }).click();
+  await issue.getByRole('button', { name: 'Enviar para verificação', exact: true }).click();
+  await issue.getByRole('button', { name: 'Aprovar e concluir', exact: true }).click();
   const resolved = await page.evaluate((id) => {
     const state = JSON.parse(localStorage.getItem('ativos_demo_state_v1')!);
     return state.issues.find((item: { id: string }) => item.id === id);

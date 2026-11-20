@@ -63,6 +63,7 @@ export function InspectionReport({
                   </p>
                   <p className="mt-0.5 break-words text-[#526980]">
                     Modelo: {record.templateNameSnapshot}
+                    {` · v${record.templateVersion ?? 1}`}
                   </p>
                 </div>
                 <div className="text-[#476078] sm:text-right">
@@ -93,6 +94,7 @@ export function InspectionReport({
                       <p className="min-w-0 break-words font-medium leading-relaxed text-[#17324D]">
                         {answer.label}
                         {answer.numericValue ? ` (${answer.numericValue} ${answer.unit ?? ''})` : ''}
+                        {answer.value ? `: ${answer.type === 'date'?formatDateBR(answer.value):answer.value}` : ''}
                       </p>
                       <span className={`shrink-0 font-semibold ${
                         answer.status === 'conforming'
@@ -140,6 +142,8 @@ export function InspectionReport({
                         <strong>
                           {issue.status === 'resolved'
                             ? 'Resolvida'
+                            : issue.status === 'awaiting_review'
+                              ? 'Aguardando verificação'
                             : issue.status === 'in_progress'
                               ? 'Em tratamento'
                               : 'Aberta'}:
@@ -152,6 +156,7 @@ export function InspectionReport({
                       {issue.resolvedAt && (
                         <p className="mt-1 text-[11px]">Concluída em {formatDateTimeBR(issue.resolvedAt)}</p>
                       )}
+                      {issue.treatmentPhotoDataUrl && <figure className="mt-2"><img src={issue.treatmentPhotoDataUrl} alt={`Tratamento: ${issue.title}`} className="max-h-64 max-w-full rounded-md object-contain" /><figcaption className="mt-1 text-[11px]">Evidência do tratamento</figcaption></figure>}
                     </div>
                   ))}
                 </section>

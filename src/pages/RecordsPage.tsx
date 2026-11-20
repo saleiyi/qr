@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useAppState } from '../context/AppStateContext';
 import { AppShell } from '../components/AppShell';
-import { formatDateTimeBR } from '../utils/date';
+import { formatDateBR, formatDateTimeBR } from '../utils/date';
 import { buildRecordsCsv, downloadTextFile } from '../utils/csv';
 import type { InspectionRecord } from '../types/domain';
 import { InspectionReport } from '../components/InspectionReport';
@@ -448,6 +448,7 @@ export const RecordsPage: React.FC = () => {
                           Leitura: {ans.numericValue} {ans.unit}
                         </p>
                       )}
+                      {ans.value && <p className="mt-1 font-medium text-[#35506B]">Resposta: {ans.type === 'date'?formatDateBR(ans.value):ans.value}</p>}
                       {ans.note && (
                         <p className="mt-1 text-[#B42318]">Obs.: {ans.note}</p>
                       )}

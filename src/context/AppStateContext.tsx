@@ -9,8 +9,6 @@ import type {
   CompanyProfile,
   DemoSettings,
   InspectionRecord,
-  Issue,
-  IssueStatus,
   Member,
   UserRole,
 } from '../types/domain';
@@ -23,7 +21,6 @@ import {
   buildInspectionSubmission,
   computeWorkspaceStats,
   DraftAnswerMap,
-  resolveIssueWithOutcome,
   type WorkspaceStats,
 } from '../utils/domainLogic';
 
@@ -65,16 +62,6 @@ interface AppStateContextValue extends OperationsActions {
     idempotencyKey: string;
     taskId?: string;
   }) => { ok: boolean; record?: InspectionRecord; createdIssuesCount?: number; error?: string };
-  updateIssueStatus: (
-    issueId: string,
-    status: Exclude<IssueStatus, 'resolved'>,
-  ) => { ok: boolean; error?: string };
-  resolveIssue: (
-    issueId: string,
-    resolutionNote: string,
-    resolverId: string,
-  ) => { ok: boolean; error?: string };
-  saveTemplate: (template: ChecklistTemplate) => { ok: boolean; error?: string };
   applyTemplateToCategory: (
     templateId: string,
     category: string,
@@ -343,78 +330,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
     [state, commitState, addToast, demoSettings.activeDemoRole],
   );
 
-  const updateIssueStatus = useCallback(
-    (issueId: string, status: Exclude<IssueStatus, 'resolved'>) => {
-      const nextIssues = state.issues.map((iss) =>
-        iss.id === issueId
-          ? { ...iss, status, updatedAt: APP_CONFIG.demoClockISO }
-          : iss,
-      );
-      const res = commitState({ ...state, issues: nextIssues });
-      if (!res.ok) return { ok: false, error: res.error };
-      addToast({
-        type: 'success',
-        title: 'Status da pendência atualizado',
-      });
-      return { ok: true };
-    },
-    [state, commitState, addToast],
-  );
-
-  const resolveIssue = useCallback(
-    (issueId: string, resolutionNote: string, resolverId: string) => {
-      const issue = state.issues.find((i) => i.id === issueId);
-      if (!issue) return { ok: false, error: 'Pendência não encontrada.' };
-
-      const result = resolveIssueWithOutcome(
-        issue,
-        resolutionNote,
-        resolverId,
-        APP_CONFIG.demoClockISO,
-      );
-      if (result.error || !result.updatedIssue) {
-        return { ok: false, error: result.error };
-      }
-
-      const nextIssues = state.issues.map((i) =>
-        i.id === issueId ? result.updatedIssue! : i,
-      );
-      const res = commitState({ ...state, issues: nextIssues });
-      if (!res.ok) return { ok: false, error: res.error };
-      addToast({
-        type: 'success',
-        title: 'Pendência concluída',
-        description: 'Tratamento registrado e indicadores atualizados.',
-      });
-      return { ok: true };
-    },
-    [state, commitState, addToast],
-  );
-
-  const saveTemplate = useCallback(
-    (template: ChecklistTemplate) => {
-      const updated = {
-        ...template,
-        updatedAt: APP_CONFIG.demoClockISO,
-      };
-      const exists = state.templates.some((t) => t.id === updated.id);
-      const nextTemplates = exists
-        ? state.templates.map((t) => (t.id === updated.id ? updated : t))
-        : [...state.templates, updated];
-      const res = commitState({ ...state, templates: nextTemplates });
-      if (!res.ok) return { ok: false, error: res.error };
-      addToast({
-        type: 'success',
-        title: 'Modelo de inspeção salvo',
-        description: 'Alterações se aplicam às próximas inspeções sem alterar registros passados.',
-      });
-      return { ok: true };
-    },
-    [state, commitState, addToast],
-  );
-
   const applyTemplateToCategory = useCallback(
     (templateId: string, category: string) => {
+      if (demoSettings.activeDemoRole !== 'admin' || !state.templates.some(t=>t.id === templateId)) return {ok:false,updatedCount:0,error:'Selecione um modelo publicado com perfil de administrador.'};
       let updatedCount = 0;
       const nextAssets = state.assets.map((a) => {
         if (category === 'all' || a.category === category) {
@@ -432,7 +350,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
       });
       return { ok: true, updatedCount };
     },
-    [state, commitState, addToast],
+    [state, commitState, addToast, demoSettings.activeDemoRole],
   );
 
   const updateCompany = useCallback(
@@ -548,9 +466,6 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
         reactivateAsset,
         importAssetsBatch,
         submitInspection,
-        updateIssueStatus,
-        resolveIssue,
-        saveTemplate,
         applyTemplateToCategory,
         updateCompany,
         addMember,

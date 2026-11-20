@@ -12,7 +12,8 @@ import { AssetsPage } from './pages/AssetsPage';
 import { AssetDetailPage } from './pages/AssetDetailPage';
 import { MobileScanPage } from './pages/MobileScanPage';
 import { InspectionFormPage } from './pages/InspectionFormPage';
-import { IssuesPage } from './pages/IssuesPage';
+import { WorkOrdersPage } from './pages/WorkOrdersPage';
+import { RepairRequestForm } from './components/RepairRequestForm';
 import { RecordsPage } from './pages/RecordsPage';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -28,12 +29,13 @@ const router = createBrowserRouter([
   { path: '/app', element: <DashboardPage /> },
   { path: '/app/assets', element: <AssetsPage /> },
   { path: '/app/assets/:id', element: <AssetDetailPage /> },
-  { path: '/app/issues', element: <IssuesPage /> },
+  { path: '/app/issues', element: <WorkOrdersPage /> },
   { path: '/app/plans', element: <PlansPage /> },
   { path: '/app/records', element: <RecordsPage /> },
   { path: '/app/templates', element: <TemplatesPage /> },
   { path: '/app/settings', element: <SettingsPage /> },
   { path: '/a/:id', element: <MobileScanPage /> },
+  { path: '/a/:id/request', element: <RepairRequestForm /> },
   { path: '/a/:id/inspect', element: <InspectionRoute /> },
   { path: '*', element: <Navigate to="/" replace /> },
 ]);

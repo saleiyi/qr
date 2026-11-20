@@ -422,6 +422,8 @@ export const InspectionFormPage: React.FC = () => {
           )}
 
           <div className="mt-6 space-y-2.5">
+            <Link to={`/app/records?recordId=${record.id}`} className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-[#DCE4EC] bg-white px-4 text-sm font-semibold text-[#176B5B]">Ver registro completo</Link>
+            {taskId && <Link to="/app/plans" className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-[#DCE4EC] bg-white px-4 text-sm font-semibold text-[#17324D]">Voltar à agenda</Link>}
             {createdIssuesCount > 0 && (
               <Link
                 to={`/app/issues?assetId=${asset.id}`}
