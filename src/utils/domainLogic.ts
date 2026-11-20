@@ -11,6 +11,7 @@ import type {
   Member,
 } from '../types/domain';
 import { addDaysISODate, diffDays } from './date';
+import { effectiveAnswer, visibleItems } from './checklist';
 
 export function computeAssetInspectionStatus(
   asset: Asset,
@@ -97,7 +98,7 @@ export function computeWorkspaceStats(
     okCount,
     openIssuesCount,
     inProgressIssuesCount,
-    unresolvedIssuesCount: openIssuesCount + inProgressIssuesCount,
+    unresolvedIssuesCount: issues.filter(issue => issue.status !== 'resolved').length,
     totalRecordsCount: records.length,
     recentApprovedCount,
   };
@@ -213,6 +214,7 @@ export interface DraftAnswerMap {
   [itemId: string]: {
     status?: ChecklistAnswerValue;
     numericValue?: string;
+    value?: string;
     note?: string;
     photoDataUrl?: string;
     photoName?: string;
@@ -230,17 +232,24 @@ export function validateInspectionDraft(
 ): InspectionValidationError[] {
   const errors: InspectionValidationError[] = [];
 
-  for (const item of template.items) {
-    const ans = answers[item.id];
+  for (const item of visibleItems(template, answers)) {
+    const ans = effectiveAnswer(item, answers[item.id]);
     if (item.required && (!ans || !ans.status)) {
       errors.push({
         itemId: item.id,
-        message: 'Selecione Conforme, Não conforme ou N/A.',
+        message: item.type === 'single_choice' || item.type === 'date' ? 'Responda esta pergunta.' : 'Selecione Conforme, Não conforme ou N/A.',
       });
       continue;
     }
 
     if (!ans || !ans.status) continue;
+
+    if (item.type === 'single_choice' && ans.value && !item.options?.includes(ans.value)) {
+      errors.push({itemId:item.id,message:'Selecione uma opção válida.'});
+    }
+    if (item.type === 'date' && ans.value && !/^\d{4}-\d{2}-\d{2}$/.test(ans.value)) {
+      errors.push({itemId:item.id,message:'Informe uma data válida.'});
+    }
 
     if (item.type === 'number' && ans.status !== 'na') {
       const val = (ans.numericValue ?? '').trim();
@@ -249,7 +258,7 @@ export function validateInspectionDraft(
           itemId: item.id,
           message: `Informe a leitura numérica${item.unit ? ` (${item.unit})` : ''}.`,
         });
-      } else if (val && Number.isNaN(Number(val.replace(',', '.')))) {
+      } else if (val && !Number.isFinite(Number(val.replace(',', '.')))) {
         errors.push({
           itemId: item.id,
           message: 'Informe um valor numérico válido.',
@@ -306,8 +315,8 @@ export function buildInspectionSubmission(params: {
   let naCount = 0;
   const compiledAnswers: InspectionAnswer[] = [];
 
-  for (const item of params.template.items) {
-    const raw = params.answers[item.id];
+  for (const item of visibleItems(params.template, params.answers)) {
+    const raw = effectiveAnswer(item, params.answers[item.id]);
     const status: ChecklistAnswerValue = raw?.status ?? 'na';
     if (status === 'conforming') conformingCount++;
     else if (status === 'non_conforming') nonConformingCount++;
@@ -321,6 +330,7 @@ export function buildInspectionSubmission(params: {
       unit: item.unit,
       status,
       numericValue: raw?.numericValue?.trim() || undefined,
+      value: raw?.value,
       note: raw?.note?.trim() || undefined,
       photoDataUrl: raw?.photoDataUrl,
       photoName: raw?.photoName,
@@ -339,6 +349,7 @@ export function buildInspectionSubmission(params: {
     siteIdSnapshot: params.asset.siteId,
     templateId: params.template.id,
     templateNameSnapshot: params.template.name,
+    templateVersion: params.template.version ?? 1,
     inspectorId: params.inspector.id,
     inspectorNameSnapshot: params.inspector.name,
     submittedAt: params.submittedAtISO,

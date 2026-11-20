@@ -1,5 +1,7 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { APP_CONFIG } from '../config/appConfig';
+import { createOperationsActions, type OperationsActions } from './operationsActions';
+import { validateInspectionDraft } from '../utils/domainLogic';
 import type {
   AppStateData,
   Asset,
@@ -32,7 +34,7 @@ export interface ToastMessage {
   description?: string;
 }
 
-interface AppStateContextValue {
+interface AppStateContextValue extends OperationsActions {
   state: AppStateData;
   effectiveState: AppStateData;
   stats: WorkspaceStats;
@@ -61,6 +63,7 @@ interface AppStateContextValue {
     generalNotes: string;
     answers: DraftAnswerMap;
     idempotencyKey: string;
+    taskId?: string;
   }) => { ok: boolean; record?: InspectionRecord; createdIssuesCount?: number; error?: string };
   updateIssueStatus: (
     issueId: string,
@@ -256,16 +259,27 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
       generalNotes: string;
       answers: DraftAnswerMap;
       idempotencyKey: string;
+      taskId?: string;
     }) => {
       const asset = state.assets.find((a) => a.id === params.assetId);
       const template = state.templates.find((t) => t.id === params.templateId);
       const inspector = state.members.find((m) => m.id === params.inspectorId);
+      const task = params.taskId ? state.tasks.find(t=>t.id === params.taskId) : undefined;
+      if (params.taskId && (!task || task.assetId !== params.assetId || task.templateId !== params.templateId)) return {ok:false,error:'Tarefa não encontrada para este equipamento.'};
+      if (task?.status === 'completed') {
+        const record=state.records.find(r=>r.id === task.recordId);
+        return record?{ok:true,record,createdIssuesCount:0}:{ok:false,error:'Esta tarefa já foi concluída.'};
+      }
       if (!asset || !template || !inspector) {
         return {
           ok: false,
           error: 'Dados de equipamento, modelo ou inspetor não encontrados.',
         };
       }
+
+      if (demoSettings.activeDemoRole === 'viewer' || asset.operationalStatus === 'inactive') return {ok:false,error:'Este equipamento ou perfil permite apenas consulta.'};
+      const invalid=validateInspectionDraft(template,params.answers);
+      if (invalid.length) return {ok:false,error:invalid[0].message};
 
       // Use real time component on the demo date for clear chronological ordering within the same day
       const now = new Date();
@@ -299,11 +313,13 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       const { record, updatedAsset, createdIssues } = submission.result;
+      record.taskId=task?.id;
       const nextState: AppStateData = {
         ...state,
         assets: state.assets.map((a) => (a.id === updatedAsset.id ? updatedAsset : a)),
         records: [record, ...state.records],
         issues: [...createdIssues, ...state.issues],
+        tasks: state.tasks.map(t=>t.id === task?.id ? {...t,status:'completed',completedAt:submittedAtISO,recordId:record.id}:t),
       };
 
       const res = commitState(nextState);
@@ -324,7 +340,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
         createdIssuesCount: createdIssues.length,
       };
     },
-    [state, commitState, addToast],
+    [state, commitState, addToast, demoSettings.activeDemoRole],
   );
 
   const updateIssueStatus = useCallback(
@@ -492,6 +508,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
         assets: [],
         records: [],
         issues: [],
+        plans: [],
+        tasks: [],
+        templateDrafts: [],
       };
     }
     return state;
@@ -508,9 +527,12 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({
     [effectiveState],
   );
 
+  const operations=useMemo(()=>createOperationsActions(state,commitState,demoSettings.activeDemoRole,addToast),[state,commitState,demoSettings.activeDemoRole,addToast]);
+
   return (
     <AppStateContext.Provider
       value={{
+        ...operations,
         state,
         effectiveState,
         stats,

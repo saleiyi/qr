@@ -1,5 +1,6 @@
 import type { AppStateData, InspectionDraft } from '../types/domain';
 import { createInitialSeedData } from '../data/seedData';
+import { normalizeOperationsState } from '../utils/operations';
 
 const STORAGE_KEY = 'ativos_demo_state_v1';
 const DRAFT_PREFIX = 'ativos_demo_draft_v1_';
@@ -23,7 +24,7 @@ export function loadAppState(): AppStateData {
       const seed = createInitialSeedData();
       return seed;
     }
-    return parsed;
+    return normalizeOperationsState(parsed);
   } catch {
     return createInitialSeedData();
   }
@@ -75,9 +76,9 @@ export function resetAppStateStorage(): AppStateData {
   return seed;
 }
 
-export function loadInspectionDraft(assetId: string): InspectionDraft | null {
+export function loadInspectionDraft(assetId: string, taskId?: string): InspectionDraft | null {
   try {
-    const raw = window.localStorage.getItem(`${DRAFT_PREFIX}${assetId}`);
+    const raw = window.localStorage.getItem(`${DRAFT_PREFIX}${assetId}${taskId ? `:${taskId}` : ''}`);
     if (!raw) return null;
     return JSON.parse(raw) as InspectionDraft;
   } catch {
@@ -97,7 +98,7 @@ export function saveInspectionDraft(
   }
   try {
     window.localStorage.setItem(
-      `${DRAFT_PREFIX}${draft.assetId}`,
+      `${DRAFT_PREFIX}${draft.assetId}${draft.taskId ? `:${draft.taskId}` : ''}`,
       JSON.stringify(draft),
     );
     return { ok: true };
@@ -109,9 +110,9 @@ export function saveInspectionDraft(
   }
 }
 
-export function clearInspectionDraft(assetId: string): void {
+export function clearInspectionDraft(assetId: string, taskId?: string): void {
   try {
-    window.localStorage.removeItem(`${DRAFT_PREFIX}${assetId}`);
+    window.localStorage.removeItem(`${DRAFT_PREFIX}${assetId}${taskId ? `:${taskId}` : ''}`);
   } catch {
     // ignore
   }
