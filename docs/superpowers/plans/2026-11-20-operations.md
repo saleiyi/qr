@@ -41,20 +41,20 @@ Files: pages/PlansPage.tsx, pages/InspectionFormPage.tsx, App.tsx,
 components/AppShell.tsx, pages/DashboardPage.tsx, tests/operations.spec.ts.
 Consumes plan/task context and checklist helpers from Task 1. Route /app/plans;
 inspection query taskId selects the task's published template and isolated draft.
-- [ ] Add/run failing browser tests for plan creation, scheduled execution and
+- [x] Add/run failing browser tests for plan creation, scheduled execution and
   reload idempotency, plus a legacy-storage fixture.
-- [ ] Implement agenda/calendar, creation, filters, completion links and form fields.
-- [ ] Run task browser cases, domain suites and TypeScript; commit.
+- [x] Implement agenda/calendar, creation, filters, completion links and form fields.
+- [x] Run task browser cases, domain suites and TypeScript; commit.
 
 ## Task 3: Repair requests and work orders
 Files: components/RepairRequestForm.tsx, pages/MobileScanPage.tsx,
 pages/IssuesPage.tsx, components/InspectionReport.tsx, tests/operations.spec.ts.
 Consumes createRepairRequest/changeWorkOrder. /a/:id/request is a repair form;
 existing /app/issues remains the work queue. Orders retain original record links.
-- [ ] Add/run failing browser cases for QR request, assignment, treatment photo,
+- [x] Add/run failing browser cases for QR request, assignment, treatment photo,
   review rejection/approval, storage failure and read-only role.
-- [ ] Implement connected request, list/board and accessible order details.
-- [ ] Run task cases, original regressions and TypeScript; commit.
+- [x] Implement connected request, list/board and accessible order details.
+- [x] Run task cases, original regressions and TypeScript; commit.
 
 ## Task 4: Template authoring and final acceptance
 Files: pages/TemplatesPage.tsx, components/ChecklistPreview.tsx,

@@ -255,7 +255,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               <Menu className="h-5 w-5" />
             </button>
             <div className="min-w-0">
-              <h1 className="truncate text-lg font-bold tracking-tight text-[#17324D] sm:text-xl">
+              <h1 className="text-base font-bold leading-tight tracking-tight text-[#17324D] sm:text-xl sm:leading-normal">
                 {title}
               </h1>
               {subtitle && (

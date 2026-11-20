@@ -46,3 +46,27 @@ Drafts and demo data are browser-local. Use the reset action in Settings to retu
 to the initial examples. Failed saves preserve current input and display a retry
 action; the browser warns before leaving with unsaved inspection input.
 While a photo is being processed, saving and submission wait for the attachment.
+
+## Inspection operations
+
+- `/app/plans`: daily, weekly or monthly plans for selected equipment, a published
+  checklist and an inspector. Agenda and calendar show linked task executions.
+  The browser materializes a 90-day window and extends it when data loads.
+  Month-end schedules retain their original day; completed instances are retained.
+- `/a/:id/request`: standalone QR repair requests with priority and optional photo.
+  Requests enter `/app/issues` unassigned. Assign a technician and deadline, start
+  treatment, submit notes/photos for review, then approve or return with a reason.
+  An order awaiting review still counts as unresolved.
+- `/app/templates`: create/copy checklists, save drafts separately, test a phone
+  preview, and publish a numbered version. Fields support conformity, numbers,
+  single choices and dates; conditions refer to preceding answers. Out-of-range
+  readings require a non-conformity description. Hidden answers are not submitted.
+
+Scheduled inspections have separate draft keys and complete their task atomically
+with the record. Reopening a completed task links to the saved result. Old browser
+saves retain equipment edits when the new collections are added. Existing records
+retain their question/answer snapshots; new records also retain template versions.
+
+The profile switch demonstrates administrator/operator/viewer interfaces within
+the current app session. It provides no real authentication or access security.
+These operations do not send emails or WhatsApp messages or synchronize devices.
