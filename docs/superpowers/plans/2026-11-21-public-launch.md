@@ -29,20 +29,20 @@ account. Keep demo storage browser-local and retain the current app routes.
 
 ### Task 1: Prepare the public artifact
 
-- [ ] Update `src/config/appConfig.ts`, `index.html` and README branding.
-- [ ] Add `public/favicon.svg`, `public/robots.txt`, `public/_headers` and `wrangler.toml`.
-- [ ] Run `npm run lint`, `npm run build`, inspect the resulting static files,
+- [x] Update `src/config/appConfig.ts`, `index.html` and README branding.
+- [x] Add `public/favicon.svg`, `public/robots.txt`, `public/_headers` and `wrangler.toml`.
+- [x] Run `npm run lint`, `npm run build`, inspect the resulting static files,
       and verify mobile navigation without changing application logic.
 
 ### Task 2: Publish and verify
 
-- [ ] Create the separate Pages project after checking for an existing match.
-- [ ] Commit the prepared source and deploy `dist` with its source revision.
-- [ ] Verify public HTTPS, root/deep routes, indexing headers and a browser-local save.
-- [ ] Record the actual deployment URL and evidence in `docs/LAUNCH.md`.
+- [x] Create the separate Pages project after checking for an existing match.
+- [x] Commit the prepared source and deploy `dist` with its source revision.
+- [x] Verify public HTTPS, root/deep routes, indexing headers and a browser-local save.
+- [x] Record the actual deployment URL and evidence in `docs/LAUNCH.md`.
 
 ### Task 3: Complete the domain handoff
 
-- [ ] Present the exact live domain quote and renewal terms for confirmation.
+- [x] Present the exact live domain quote and renewal terms for confirmation.
 - [ ] After purchase authorization, recheck availability and register one year.
 - [ ] Bind the domain, verify DNS/TLS, add canonical metadata/sitemap and redeploy.

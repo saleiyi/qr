@@ -18,11 +18,35 @@ Date: 2026-11-21 (Asia/Taipei).
 
 - Platform: Cloudflare Pages, static Direct Upload.
 - Project name: `tagronda`; separate from existing account projects.
-- Deployment: **being prepared**.
+- Public URL: https://tagronda.pages.dev
+- Immutable deployment URL: https://16cf8268.tagronda.pages.dev
+- Deployment ID: `16cf8268-1304-4c05-80b9-8a67c6fa8f60`.
+- Deployment state: **production / deploy success** (Cloudflare API read-back).
+- Deployed source commit: `e63efa6344b250e767dfd91ba2901f26550e2aef`.
 - SPA: native Pages fallback, no root `404.html`.
 - Secrets: existing encrypted local credentials are read only by deployment tools;
   they are never copied into the source or static artifact.
 - Source: https://github.com/saleiyi/qr/tree/codex/frontend-demo-polish
+
+## Verified on the public origin
+
+- TypeScript check and production build passed; static artifact inspection found
+  no credential patterns, environment files or source maps.
+- HTTPS returned 200 with normal certificate validation. The presented
+  `tagronda.pages.dev` certificate covers the primary and wildcard preview hosts
+  and is valid from 2026-11-21 to 2027-02-19.
+- Chrome checked 375px and 1440px homepages and captured screenshots; both fit
+  without horizontal overflow. Visual inspection confirmed the longer brand fits.
+- Direct visits to `/app/plans`, `/app/issues`, `/app/templates`, `/a/eq-001` and
+  `/a/eq-001/request` returned 200, rendered successfully and returned `noindex`.
+- The public origin reports a secure context and Web Locks support. A QR repair
+  request was saved and still appeared after a reload. This test used a fresh,
+  disposable browser context, with no real customer information.
+- No browser page errors occurred during that public-origin smoke check.
+- Local verification artifacts are ignored under `.superpowers/launch-public/`.
+  The headless browser required the machine's existing HTTP proxy; TLS validation
+  remained enabled. Initial direct/browser and Python requests failed before the
+  successful verified curl and Chrome checks.
 
 ## Public scope
 
