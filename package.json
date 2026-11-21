@@ -12,7 +12,8 @@
     "test": "node --import tsx --test src/utils/domainLogic.test.ts src/utils/operations.test.ts src/utils/operations-review.test.ts src/services/pilotClient.test.ts",
     "test:backend": "node --import tsx --test server/pilot.test.ts server/runtime.test.ts",
     "test:e2e": "playwright test",
-    "test:pilot": "playwright test --config playwright.pilot.config.ts"
+    "test:pilot": "playwright test --config playwright.pilot.config.ts",
+    "prepare:pilot-test": "node --import tsx scripts/prepare-pilot-tests.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

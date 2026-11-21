@@ -31,25 +31,25 @@ D1 and private R2, with separate preview/production resources.
 
 ### Task 1: Backend, persistence and authentication
 
-- [ ] Define migrations, D1/R2 environment interfaces and Better Auth configuration.
-- [ ] Write and observe failing real-emulator auth/tenant/command tests.
-- [ ] Implement invite enrollment, secure sessions, role checks and command API.
-- [ ] Implement private images, current-clock domain operations and admin export.
-- [ ] Verify concurrency/idempotency, validation, isolation and role revocation.
+- [x] Define migrations, D1/R2 environment interfaces and Better Auth configuration.
+- [x] Write and observe failing real-emulator auth/tenant/command tests.
+- [x] Implement invite enrollment, secure sessions, role checks and command API.
+- [x] Implement private images, current-clock domain operations and admin export.
+- [x] Verify concurrency/idempotency, validation, isolation and role revocation.
 
 ### Task 2: Live workspace frontend
 
-- [ ] Implement login/activation, demo/live distinction and protected deep links.
-- [ ] Add typed cloud client and route existing context actions through commands.
-- [ ] Use authenticated inspector identity and server clock; isolate drafts.
-- [ ] Add actual invitations, synchronization/retry controls and logout handling.
-- [ ] Verify original demo tests and two-device live frontend acceptance.
+- [x] Implement login/activation, demo/live distinction and protected deep links.
+- [x] Add typed cloud client and route existing context actions through commands.
+- [x] Use authenticated inspector identity and server clock; isolate drafts.
+- [x] Add actual invitations, synchronization/retry controls and logout handling.
+- [x] Verify original demo tests and two-device live frontend acceptance.
 
 ### Task 3: Provisioning, integration and release
 
-- [ ] Provision separate Tagronda preview/production D1 and R2, secrets and bindings.
-- [ ] Run additive migrations and prepare private owner enrollment.
-- [ ] Exercise local emulator and preview with independent browser contexts.
-- [ ] Independently review security/correctness; resolve substantive findings.
-- [ ] Deploy production, verify its API and business flow, document recovery and
+- [x] Provision separate Tagronda preview/production D1 and R2, secrets and bindings.
+- [x] Run additive migrations and prepare private owner enrollment.
+- [x] Exercise local emulator and preview with independent browser contexts.
+- [x] Independently review security/correctness; resolve substantive findings.
+- [x] Deploy production, verify its API and business flow, document recovery and
       return the private owner activation step plus trial limitations.

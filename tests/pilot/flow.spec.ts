@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
 const fixture = JSON.parse(
-  readFileSync(process.env.PILOT_TEST_FIXTURE ?? '.superpowers/pilot-e2e-fixture.json', 'utf8'),
+  readFileSync(process.env.PILOT_TEST_FIXTURE ?? '.pilot-private/e2e/fixture.json', 'utf8'),
 );
 const evidence =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=';

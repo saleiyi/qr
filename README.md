@@ -47,6 +47,22 @@ It needs disposable provisioned workspaces and an ignored fixture selected by
 Pilot screenshots and traces stay in the ignored `.superpowers/pilot-test-results/`.
 Never point acceptance seeding at a real customer's workspace.
 
+To prepare a fresh local live-flow run, configure `.dev.vars`, then run:
+
+```sh
+npm run prepare:pilot-test
+npx wrangler d1 migrations apply tagronda-pilot-preview --local
+npx wrangler d1 execute tagronda-pilot-preview --local --file .pilot-private/e2e/seed.sql
+npm run build
+npm run test:pilot
+```
+
+The test runner starts Pages on port 8788. Activation links are single-use; for a
+later run prepare a fresh output directory with `prepare:pilot-test -- <origin>
+<private-output-directory>` and select its fixture with `PILOT_TEST_FIXTURE`.
+The preparation command only writes private fixtures; it does not change a cloud
+database. Keep the generated SQL, random passwords and links out of Git.
+
 Browser tests cover reports exceeding 20 records, inspection evidence, failed
 draft persistence and retry, navigation/unload protection, nested modal keyboard
 navigation, pending photo processing, inspector-only edits, reverting saved input,

@@ -2,6 +2,39 @@
 
 Date: 2026-11-21 (Asia/Taipei).
 
+## Current backend pilot release
+
+- Live origin: https://tagronda.com; login `/login`, explicit public demo `/demo/app`.
+- Production deployment: `5e7e3d76-65ed-4029-819e-88ef3ea53a0d`.
+- Immutable deployment: https://5e7e3d76.tagronda.pages.dev.
+- Runtime source: `3588ddb95bf0ce8ccc8362ba96211cd55482b22b`, branch
+  `codex/backend-pilot`. Documentation/test preparation may have later commits.
+- Pages Functions handle `/api/*`; production and preview use separate D1
+  databases, private R2 buckets and authentication secrets. Both additive
+  migrations are applied. No paid plan was enabled.
+- Independent desktop/375px phone browser contexts passed the actual production
+  workflow: activate test accounts, invite an operator, create equipment, open its
+  generated QR link, submit a current inspection with a photo, and read the same
+  record and protected photo from management. Other-company and anonymous access
+  were denied. The two production test workspaces, three accounts and test photo
+  were removed; the real pending-owner workspace remains empty.
+- Root checks passed: 12 backend/runtime tests, 20 domain/client tests, 36 demo
+  browser tests, 4 live integration/UI tests, targeted template/settings regression,
+  TypeScript and production build. The final runtime also passed the cloud
+  staging workflow. Separate backend/frontend reviews have no remaining blockers
+  for the bounded first-customer trial.
+- A native remote D1 dump and R2 photo were restored into new disposable resources;
+  fresh login, full workspace/manifest equality, photo byte equality and isolation
+  passed. Normal preview bindings were restored afterward.
+- Production health, anonymous denial, unclaimed owner invitation, HTTPS and
+  path/query-preserving `www` redirect were checked after test cleanup.
+- Owner identity, activation link and backups are private local operational
+  artifacts and are excluded from this repository. The recipient sets their own
+  password. Invitations are shared manually; no email, billing or self-service
+  password recovery is configured. See [pilot operations](pilot-operations.md).
+
+The sections below preserve the original domain/frontend launch history.
+
 ## Brand and domain
 
 - Primary domain: https://tagronda.com
@@ -33,7 +66,7 @@ Date: 2026-11-21 (Asia/Taipei).
   query parameters are preserved. Rule ref: `tagronda_www_to_apex`, ruleset
   `164d32cd8bd8496f95ad8381ba49d627`.
 
-## Hosting
+## Original frontend deployment
 
 - Platform: Cloudflare Pages, static Direct Upload.
 - Project name: `tagronda`; separate from existing account projects.
