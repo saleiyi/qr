@@ -12,3 +12,4 @@ playwright-report/
 .superpowers/
 .wrangler/
 .dev.vars*
+!.dev.vars.example

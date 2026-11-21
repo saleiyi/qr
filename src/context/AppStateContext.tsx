@@ -7,6 +7,9 @@ import React, { createContext, useCallback, useContext, useMemo, useState } from
 import { APP_CONFIG } from '../config/appConfig';
 import { createOperationsActions, type OperationsActions } from './operationsActions';
 import { validateInspectionDraft } from '../utils/domainLogic';
+import { useOptionalPilot } from './PilotContext';
+import { createCloudActions } from './cloudActions';
+import type { PilotIdentity } from '../types/pilot';
 import type {
   AppStateData,
   Asset,
@@ -32,7 +35,9 @@ export interface ToastMessage {
   description?: string;
 }
 
-interface AppStateContextValue extends OperationsActions {
+export interface AppStateContextValue extends OperationsActions {
+  isPilot: boolean;
+  identity?: PilotIdentity;
   state: AppStateData;
   effectiveState: AppStateData;
   stats: WorkspaceStats;
@@ -57,7 +62,9 @@ interface AppStateContextValue extends OperationsActions {
     category: string,
   ) => Promise<{ ok: boolean; updatedCount: number; error?: string }>;
   updateCompany: (company: CompanyProfile) => Promise<{ ok: boolean; error?: string }>;
-  addMember: (member: Omit<Member, 'id'>) => Promise<{ ok: boolean; error?: string }>;
+  addMember: (
+    member: Omit<Member, 'id'>,
+  ) => Promise<{ ok: boolean; error?: string; invitationUrl?: string; expiresAt?: string }>;
   updateMember: (
     memberId: string,
     patch: Partial<Member>,
@@ -68,13 +75,23 @@ interface AppStateContextValue extends OperationsActions {
 const AppStateContext = createContext<AppStateContextValue | null>(null);
 
 export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [state, setState] = useState<AppStateData>(() => loadAppState());
-  const [demoSettings, setDemoSettings] = useState<DemoSettings>({
+  const pilot = useOptionalPilot();
+  const [demoState, setState] = useState<AppStateData>(() => pilot?.data?.state ?? loadAppState());
+  const state = pilot?.data?.state ?? demoState;
+  const [localDemoSettings, setDemoSettings] = useState<DemoSettings>({
     simulateLoading: false,
     simulateEmptyState: false,
     simulateStorageError: false,
     activeDemoRole: 'admin',
   });
+  const demoSettings: DemoSettings = pilot?.data
+    ? {
+        simulateLoading: false,
+        simulateEmptyState: false,
+        simulateStorageError: false,
+        activeDemoRole: pilot.data.identity.role,
+      }
+    : localDemoSettings;
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const addToast = useCallback((toast: Omit<ToastMessage, 'id'>) => {
@@ -91,6 +108,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const commitState = useCallback(
     async (nextState: AppStateData): Promise<{ ok: boolean; error?: string }> => {
+      if (pilot) return { ok: false, error: 'Esta alteração precisa ser confirmada pelo serviço.' };
       const result = await transactAppState(
         () => ({ next: nextState, value: undefined }),
         demoSettings.simulateStorageError,
@@ -103,7 +121,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setState(result.state!);
       return { ok: true };
     },
-    [state, demoSettings.simulateStorageError, addToast],
+    [state, demoSettings.simulateStorageError, addToast, pilot],
   );
 
   const setDemoRole = useCallback((role: UserRole) => {
@@ -376,6 +394,11 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     [state, commitState, demoSettings.activeDemoRole, addToast],
   );
 
+  const cloudActions = useMemo(
+    () => (pilot?.data ? createCloudActions(pilot, pilot.data.identity, addToast) : null),
+    [pilot, addToast],
+  );
+
   return (
     <AppStateContext.Provider
       value={{
@@ -400,6 +423,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         addMember,
         updateMember,
         resetDemoData,
+        ...cloudActions,
+        isPilot: Boolean(pilot),
+        identity: pilot?.data?.identity,
       }}
     >
       {children}

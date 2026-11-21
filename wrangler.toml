@@ -1,2 +1,43 @@
 name = "tagronda"
 pages_build_output_dir = "./dist"
+compatibility_date = "2026-11-21"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+APP_ORIGIN = "http://127.0.0.1:8788"
+
+[[d1_databases]]
+binding = "PILOT_DB"
+database_name = "tagronda-pilot-preview"
+database_id = "351668f8-6bfe-4cce-b8d1-e20d6a0a6060"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "PILOT_FILES"
+bucket_name = "tagronda-pilot-preview-private"
+
+[env.preview.vars]
+APP_ORIGIN = "https://pilot-staging.tagronda.pages.dev"
+
+[[env.preview.d1_databases]]
+binding = "PILOT_DB"
+database_name = "tagronda-pilot-preview"
+database_id = "351668f8-6bfe-4cce-b8d1-e20d6a0a6060"
+migrations_dir = "migrations"
+
+[[env.preview.r2_buckets]]
+binding = "PILOT_FILES"
+bucket_name = "tagronda-pilot-preview-private"
+
+[env.production.vars]
+APP_ORIGIN = "https://tagronda.com"
+
+[[env.production.d1_databases]]
+binding = "PILOT_DB"
+database_name = "tagronda-pilot-prod"
+database_id = "13546b87-1b35-44ac-a708-0f73ea334d33"
+migrations_dir = "migrations"
+
+[[env.production.r2_buckets]]
+binding = "PILOT_FILES"
+bucket_name = "tagronda-pilot-prod-private"

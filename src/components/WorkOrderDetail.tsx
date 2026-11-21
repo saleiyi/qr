@@ -18,9 +18,11 @@ import {
 } from './OperationsUI';
 
 export function WorkOrderDetail({ issue, onClose }: { issue: Issue; onClose: () => void }) {
-  const { state, demoSettings, changeWorkOrder } = useAppState();
+  const { state, demoSettings, changeWorkOrder, isPilot, identity } = useAppState();
   const admin = demoSettings.activeDemoRole === 'admin';
-  const viewer = demoSettings.activeDemoRole === 'viewer';
+  const viewer =
+    demoSettings.activeDemoRole === 'viewer' ||
+    (isPilot && !admin && issue.assigneeId !== identity?.memberId);
   const members = state.members.filter(
     (member) => member.status === 'active' && member.role !== 'viewer',
   );
@@ -33,7 +35,10 @@ export function WorkOrderDetail({ issue, onClose }: { issue: Issue; onClose: () 
   const [photoName, setPhotoName] = useState(issue.treatmentPhotoName);
   const [reviewNote, setReviewNote] = useState('');
   const [actor, setActor] = useState(
-    members.find((m) => m.role === (admin ? 'admin' : 'operator'))?.id ?? members[0]?.id ?? '',
+    identity?.memberId ??
+      members.find((m) => m.role === (admin ? 'admin' : 'operator'))?.id ??
+      members[0]?.id ??
+      '',
   );
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,6 +146,7 @@ export function WorkOrderDetail({ issue, onClose }: { issue: Issue; onClose: () 
               <FormField label="Responsável pela ação">
                 <select
                   value={actor}
+                  disabled={isPilot}
                   onChange={(event) => setActor(event.target.value)}
                   className={controlClass}
                 >

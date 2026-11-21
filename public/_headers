@@ -14,3 +14,17 @@
 
 https://:project.pages.dev/*
   X-Robots-Tag: noindex
+
+/demo
+  X-Robots-Tag: noindex, nofollow
+
+/demo/*
+  X-Robots-Tag: noindex, nofollow
+
+/login
+  X-Robots-Tag: noindex, nofollow
+  Referrer-Policy: no-referrer
+
+/activate
+  X-Robots-Tag: noindex, nofollow
+  Referrer-Policy: no-referrer

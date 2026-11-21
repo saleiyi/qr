@@ -1,3 +1,5 @@
+import { currentPilotClock } from '../services/runtimeMode';
+
 export interface DemoPlan {
   id: string;
   name: string;
@@ -15,8 +17,12 @@ export const APP_CONFIG = {
   demoLabel: 'Demonstração',
   defaultLocale: 'pt-BR' as const,
   // Unified demo clock so all dates, overdue counts, and timelines stay 100% deterministic
-  demoClockISO: '2026-11-20T10:30:00-03:00',
-  demoClockDate: '2026-11-20',
+  get demoClockISO() {
+    return currentPilotClock()?.nowISO ?? '2026-11-20T10:30:00-03:00';
+  },
+  get demoClockDate() {
+    return currentPilotClock()?.today ?? '2026-11-20';
+  },
   dueSoonWindowDays: 7,
   maxUploadBytes: 5 * 1024 * 1024,
   demoPlans: [

@@ -1,0 +1,3 @@
+# Copy to .dev.vars for local Pages development. Never reuse the production secret.
+APP_ORIGIN="http://127.0.0.1:8788"
+BETTER_AUTH_SECRET="replace-with-a-random-secret-at-least-32-characters-long"

@@ -14,22 +14,15 @@ import {
 import { APP_CONFIG } from '../config/appConfig';
 import { useAppState } from '../context/AppStateContext';
 import { AssetIllustration } from '../components/AssetIllustration';
-import {
-  InspectionStatusBadge,
-  OperationalStatusBadge,
-} from '../components/StatusBadge';
+import { InspectionStatusBadge, OperationalStatusBadge } from '../components/StatusBadge';
 import { computeAssetInspectionStatus } from '../utils/domainLogic';
-import {
-  formatDateBR,
-  formatDateTimeBR,
-  formatRelativeDueBR,
-} from '../utils/date';
+import { formatDateBR, formatDateTimeBR, formatRelativeDueBR } from '../utils/date';
 import { loadInspectionDraft } from '../services/storageAdapter';
 import type { UserRole } from '../types/domain';
 
 export const MobileScanPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { state, demoSettings, setDemoRole } = useAppState();
+  const { state, demoSettings, setDemoRole, isPilot, identity } = useAppState();
 
   const asset = state.assets.find((a) => a.id === id);
 
@@ -39,7 +32,9 @@ export const MobileScanPage: React.FC = () => {
         <div className="mx-auto max-w-md rounded-2xl border border-[#DCE4EC] bg-white p-6 text-center">
           <h1 className="text-lg font-bold">Equipamento não encontrado</h1>
           <p className="mt-2 text-sm text-[#476078]">
-            O código QR consultado não corresponde a nenhum ativo cadastrado nesta demonstração.
+            {isPilot
+              ? 'O equipamento não está disponível na sua empresa. Confira o link ou consulte o administrador.'
+              : 'O código QR consultado não corresponde a nenhum ativo cadastrado nesta demonstração.'}
           </p>
           <Link
             to="/app/assets"
@@ -56,9 +51,7 @@ export const MobileScanPage: React.FC = () => {
   const assignee = state.members.find((m) => m.id === asset.assigneeId);
   const template = state.templates.find((t) => t.id === asset.templateId);
   const inspStatus = computeAssetInspectionStatus(asset, APP_CONFIG.demoClockDate);
-  const openIssues = state.issues.filter(
-    (i) => i.assetId === asset.id && i.status !== 'resolved',
-  );
+  const openIssues = state.issues.filter((i) => i.assetId === asset.id && i.status !== 'resolved');
   const recentRecords = state.records.filter((r) => r.assetId === asset.id).slice(0, 3);
   const existingDraft = loadInspectionDraft(asset.id);
   const isViewer = demoSettings.activeDemoRole === 'viewer';
@@ -83,41 +76,44 @@ export const MobileScanPage: React.FC = () => {
           </div>
 
           <span className="rounded border border-[#2B4966] bg-[#1B3650] px-2 py-0.5 text-[10px] font-medium text-[#CBD7E4]">
-            {APP_CONFIG.demoLabel}
+            {isPilot ? 'Empresa' : APP_CONFIG.demoLabel}
           </span>
         </div>
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-5 sm:px-6">
         {/* Simulated Role View Banner */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#DCE4EC] bg-white px-4 py-2.5 text-xs shadow-xs">
-          <span className="text-[#476078]">
-            Visualização simulada de perfil:
-          </span>
-          <div className="inline-flex rounded-lg border border-[#DCE4EC] bg-[#F4F7FA] p-0.5">
-            {(
-              [
-                { id: 'operator', label: 'Operador' },
-                { id: 'admin', label: 'Admin' },
-                { id: 'viewer', label: 'Visualizador' },
-              ] as Array<{ id: UserRole; label: string }>
-            ).map((roleOpt) => (
-              <button
-                key={roleOpt.id}
-                type="button"
-                onClick={() => setDemoRole(roleOpt.id)}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap ${
-                  demoSettings.activeDemoRole === roleOpt.id
-                    ? 'bg-[#176B5B] text-white'
-                    : 'text-[#476078] hover:text-[#17324D]'
-                }`}
-              >
-                {roleOpt.label}
-              </button>
-            ))}
+        {!isPilot && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#DCE4EC] bg-white px-4 py-2.5 text-xs shadow-xs">
+            <span className="text-[#476078]">Visualização simulada de perfil:</span>
+            <div className="inline-flex rounded-lg border border-[#DCE4EC] bg-[#F4F7FA] p-0.5">
+              {(
+                [
+                  { id: 'operator', label: 'Operador' },
+                  { id: 'admin', label: 'Admin' },
+                  { id: 'viewer', label: 'Visualizador' },
+                ] as Array<{ id: UserRole; label: string }>
+              ).map((roleOpt) => (
+                <button
+                  key={roleOpt.id}
+                  type="button"
+                  onClick={() => setDemoRole(roleOpt.id)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap ${
+                    demoSettings.activeDemoRole === roleOpt.id
+                      ? 'bg-[#176B5B] text-white'
+                      : 'text-[#476078] hover:text-[#17324D]'
+                  }`}
+                >
+                  {roleOpt.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
+        {isPilot && (
+          <p className="mb-4 text-sm text-[#526980]">{identity?.name} · Acesso da sua empresa</p>
+        )}
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
           {/* Primary Identity & Task Card */}
           <div className="space-y-4 lg:col-span-7">
@@ -154,104 +150,156 @@ export const MobileScanPage: React.FC = () => {
                   </div>
                 </div>
 
-              {/* What is pending right now */}
-              <div className="mt-4 rounded-xl border border-[#DCE4EC] bg-[#F4F7FA] p-4">
-                <p className="text-xs font-semibold text-[#526980]">
-                  Situação e próximo passo
-                </p>
+                {/* What is pending right now */}
+                <div className="mt-4 rounded-xl border border-[#DCE4EC] bg-[#F4F7FA] p-4">
+                  <p className="text-xs font-semibold text-[#526980]">Situação e próximo passo</p>
 
-                {isInactive ? (
-                  <p className="mt-1.5 text-sm font-medium text-[#476078]">
-                    Equipamento desativado. Inspeções periódicas estão suspensas; consulte o histórico abaixo.
-                  </p>
-                ) : (
-                  <div className="mt-1.5 space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-[#17324D]">
-                      {inspStatus === 'overdue' ? (
-                        <>
-                          <AlertCircle className="h-4 w-4 shrink-0 text-[#B42318]" aria-hidden="true" />
-                          <span className="text-[#B42318]">
-                            {formatRelativeDueBR(
-                              asset.nextInspectionDue,
-                              APP_CONFIG.demoClockDate,
-                            )}
-                          </span>
-                        </>
-                      ) : inspStatus === 'due_soon' ? (
-                        <>
-                          <Clock className="h-4 w-4 shrink-0 text-[#B76A12]" aria-hidden="true" />
-                          <span className="text-[#B76A12]">
-                            {formatRelativeDueBR(
-                              asset.nextInspectionDue,
-                              APP_CONFIG.demoClockDate,
-                            )}
-                          </span>
-                        </>
-                      ) : inspStatus === 'never_inspected' ? (
-                        <>
-                          <ClipboardCheck className="h-4 w-4 shrink-0 text-[#35506B]" aria-hidden="true" />
-                          <span>Realizar primeira inspeção de comissionamento</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="h-4 w-4 shrink-0 text-[#137333]" aria-hidden="true" />
+                  {isInactive ? (
+                    <p className="mt-1.5 text-sm font-medium text-[#476078]">
+                      Equipamento desativado. Inspeções periódicas estão suspensas; consulte o
+                      histórico abaixo.
+                    </p>
+                  ) : (
+                    <div className="mt-1.5 space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-[#17324D]">
+                        {inspStatus === 'overdue' ? (
+                          <>
+                            <AlertCircle
+                              className="h-4 w-4 shrink-0 text-[#B42318]"
+                              aria-hidden="true"
+                            />
+                            <span className="text-[#B42318]">
+                              {formatRelativeDueBR(
+                                asset.nextInspectionDue,
+                                APP_CONFIG.demoClockDate,
+                              )}
+                            </span>
+                          </>
+                        ) : inspStatus === 'due_soon' ? (
+                          <>
+                            <Clock className="h-4 w-4 shrink-0 text-[#B76A12]" aria-hidden="true" />
+                            <span className="text-[#B76A12]">
+                              {formatRelativeDueBR(
+                                asset.nextInspectionDue,
+                                APP_CONFIG.demoClockDate,
+                              )}
+                            </span>
+                          </>
+                        ) : inspStatus === 'never_inspected' ? (
+                          <>
+                            <ClipboardCheck
+                              className="h-4 w-4 shrink-0 text-[#35506B]"
+                              aria-hidden="true"
+                            />
+                            <span>Realizar primeira inspeção de comissionamento</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2
+                              className="h-4 w-4 shrink-0 text-[#137333]"
+                              aria-hidden="true"
+                            />
+                            <span>
+                              Inspeção periódica em dia (próxima em{' '}
+                              {formatDateBR(asset.nextInspectionDue)})
+                            </span>
+                          </>
+                        )}
+                      </div>
+
+                      {openIssues.length > 0 && (
+                        <div className="flex items-start gap-2 rounded-lg border border-[#F4C7C3] bg-[#FEF3F2] px-3 py-2 text-xs text-[#B42318]">
+                          <AlertTriangle
+                            className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                            aria-hidden="true"
+                          />
                           <span>
-                            Inspeção periódica em dia (próxima em{' '}
-                            {formatDateBR(asset.nextInspectionDue)})
+                            Existem <strong>{openIssues.length} pendência(s) aberta(s)</strong>{' '}
+                            neste equipamento aguardando resolução.
                           </span>
-                        </>
+                        </div>
+                      )}
+
+                      {existingDraft && (
+                        <div className="rounded-lg border border-[#F2D3AA] bg-[#FEF6EB] px-3 py-2 text-xs text-[#B76A12]">
+                          Você possui um rascunho salvo em andamento para este equipamento.
+                        </div>
                       )}
                     </div>
+                  )}
+                </div>
 
-                    {openIssues.length > 0 && (
-                      <div className="flex items-start gap-2 rounded-lg border border-[#F4C7C3] bg-[#FEF3F2] px-3 py-2 text-xs text-[#B42318]">
-                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                        <span>
-                          Existem <strong>{openIssues.length} pendência(s) aberta(s)</strong>{' '}
-                          neste equipamento aguardando resolução.
-                        </span>
-                      </div>
-                    )}
-
-                    {existingDraft && (
-                      <div className="rounded-lg border border-[#F2D3AA] bg-[#FEF6EB] px-3 py-2 text-xs text-[#B76A12]">
-                        Você possui um rascunho salvo em andamento para este equipamento.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Desktop inline CTA */}
-              {!isViewer && !isInactive && <Link to={`/a/${asset.id}/request`} className="mt-4 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-[#DCE4EC] bg-white px-4 text-sm font-semibold text-[#176B5B] hover:bg-[#EAF4F0]"><Wrench className="h-4 w-4" />Solicitar manutenção</Link>}
-              {state.tasks.some(task=>task.assetId === asset.id && task.status === 'pending') && <div className="mt-4 space-y-2 rounded-xl border border-[#DCE4EC] bg-white p-4"><h2 className="text-sm font-semibold">Inspeções programadas</h2>{state.tasks.filter(task=>task.assetId === asset.id && task.status === 'pending').sort((a,b)=>a.dueDate.localeCompare(b.dueDate)).slice(0,2).map(task=><Link key={task.id} to={isViewer?"/app/plans":`/a/${asset.id}/inspect?taskId=${encodeURIComponent(task.id)}`} className="block rounded-lg bg-[#F4F7FA] p-3 text-xs leading-relaxed text-[#17324D]"><strong>{task.planName}</strong><span className="mt-1 block text-[#526980]">{formatDateBR(task.dueDate)} · {isViewer?'Consultar na agenda':'Abrir inspeção'}</span></Link>)}<Link to="/app/plans" className="block min-h-[36px] pt-2 text-xs font-semibold text-[#176B5B]">Ver agenda completa</Link></div>}
-              <div className="mt-4 hidden md:block">
-                {isViewer ? (
-                  <div className="flex items-center gap-2 rounded-xl border border-[#DCE4EC] bg-[#F4F7FA] px-4 py-3 text-xs text-[#476078]">
-                    <Eye className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    <span>
-                      Perfil Visualizador: apenas leitura de ficha e histórico. Alterne para Operador ou Admin para inspecionar.
-                    </span>
-                  </div>
-                ) : isInactive ? (
+                {/* Desktop inline CTA */}
+                {!isViewer && !isInactive && (
                   <Link
-                    to={`/app/assets/${asset.id}`}
-                    className="flex w-full min-h-[48px] items-center justify-center rounded-xl border border-[#DCE4EC] bg-white text-sm font-semibold text-[#17324D] hover:bg-[#F4F7FA]"
+                    to={`/a/${asset.id}/request`}
+                    className="mt-4 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-[#DCE4EC] bg-white px-4 text-sm font-semibold text-[#176B5B] hover:bg-[#EAF4F0]"
                   >
-                    Abrir ficha completa no painel
-                  </Link>
-                ) : (
-                  <Link
-                    to={`/a/${asset.id}/inspect`}
-                    className="flex w-full min-h-[48px] items-center justify-center gap-2 rounded-xl bg-[#176B5B] px-5 text-sm font-semibold text-white hover:bg-[#125548]"
-                  >
-                    <ClipboardCheck className="h-4 w-4" aria-hidden="true" />
-                    <span>
-                      {existingDraft ? 'Continuar inspeção (rascunho)' : 'Iniciar inspeção'}
-                    </span>
+                    <Wrench className="h-4 w-4" />
+                    Solicitar manutenção
                   </Link>
                 )}
-              </div>
+                {state.tasks.some(
+                  (task) => task.assetId === asset.id && task.status === 'pending',
+                ) && (
+                  <div className="mt-4 space-y-2 rounded-xl border border-[#DCE4EC] bg-white p-4">
+                    <h2 className="text-sm font-semibold">Inspeções programadas</h2>
+                    {state.tasks
+                      .filter((task) => task.assetId === asset.id && task.status === 'pending')
+                      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+                      .slice(0, 2)
+                      .map((task) => (
+                        <Link
+                          key={task.id}
+                          to={
+                            isViewer || (isPilot && task.assigneeId !== identity?.memberId)
+                              ? '/app/plans'
+                              : `/a/${asset.id}/inspect?taskId=${encodeURIComponent(task.id)}`
+                          }
+                          className="block rounded-lg bg-[#F4F7FA] p-3 text-xs leading-relaxed text-[#17324D]"
+                        >
+                          <strong>{task.planName}</strong>
+                          <span className="mt-1 block text-[#526980]">
+                            {formatDateBR(task.dueDate)} ·{' '}
+                            {isViewer || (isPilot && task.assigneeId !== identity?.memberId) ? 'Consultar na agenda' : 'Abrir inspeção'}
+                          </span>
+                        </Link>
+                      ))}
+                    <Link
+                      to="/app/plans"
+                      className="block min-h-[36px] pt-2 text-xs font-semibold text-[#176B5B]"
+                    >
+                      Ver agenda completa
+                    </Link>
+                  </div>
+                )}
+                <div className="mt-4 hidden md:block">
+                  {isViewer ? (
+                    <div className="flex items-center gap-2 rounded-xl border border-[#DCE4EC] bg-[#F4F7FA] px-4 py-3 text-xs text-[#476078]">
+                      <Eye className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span>
+                        {isPilot ? 'Seu perfil permite consultar a ficha e o histórico. Solicite acesso de operador ao administrador para inspecionar.' : 'Perfil Visualizador: apenas leitura de ficha e histórico. Alterne para Operador ou Admin para inspecionar.'}
+                      </span>
+                    </div>
+                  ) : isInactive ? (
+                    <Link
+                      to={`/app/assets/${asset.id}`}
+                      className="flex w-full min-h-[48px] items-center justify-center rounded-xl border border-[#DCE4EC] bg-white text-sm font-semibold text-[#17324D] hover:bg-[#F4F7FA]"
+                    >
+                      Abrir ficha completa no painel
+                    </Link>
+                  ) : (
+                    <Link
+                      to={`/a/${asset.id}/inspect`}
+                      className="flex w-full min-h-[48px] items-center justify-center gap-2 rounded-xl bg-[#176B5B] px-5 text-sm font-semibold text-white hover:bg-[#125548]"
+                    >
+                      <ClipboardCheck className="h-4 w-4" aria-hidden="true" />
+                      <span>
+                        {existingDraft ? 'Continuar inspeção (rascunho)' : 'Iniciar inspeção'}
+                      </span>
+                    </Link>
+                  )}
+                </div>
               </div>
             </section>
 
@@ -275,9 +323,7 @@ export const MobileScanPage: React.FC = () => {
                 </div>
                 <div>
                   <dt className="text-[#526980]">Responsável</dt>
-                  <dd className="mt-0.5 font-medium text-[#17324D]">
-                    {assignee?.name ?? '—'}
-                  </dd>
+                  <dd className="mt-0.5 font-medium text-[#17324D]">{assignee?.name ?? '—'}</dd>
                 </div>
                 <div>
                   <dt className="text-[#526980]">Checklist padrão</dt>
@@ -328,9 +374,7 @@ export const MobileScanPage: React.FC = () => {
 
             <section className="rounded-2xl border border-[#DCE4EC] bg-white p-5">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-[#17324D]">
-                  Últimas inspeções
-                </h2>
+                <h2 className="text-sm font-semibold text-[#17324D]">Últimas inspeções</h2>
                 <Link
                   to={`/app/assets/${asset.id}`}
                   className="text-xs font-semibold text-[#176B5B] hover:underline"
@@ -352,19 +396,13 @@ export const MobileScanPage: React.FC = () => {
                         </span>
                         <span
                           className={`font-semibold ${
-                            rec.overallResult === 'approved'
-                              ? 'text-[#137333]'
-                              : 'text-[#B42318]'
+                            rec.overallResult === 'approved' ? 'text-[#137333]' : 'text-[#B42318]'
                           }`}
                         >
-                          {rec.overallResult === 'approved'
-                            ? 'Aprovada'
-                            : 'Com pendências'}
+                          {rec.overallResult === 'approved' ? 'Aprovada' : 'Com pendências'}
                         </span>
                       </div>
-                      <p className="mt-0.5 text-[#526980]">
-                        Inspetor: {rec.inspectorNameSnapshot}
-                      </p>
+                      <p className="mt-0.5 text-[#526980]">Inspetor: {rec.inspectorNameSnapshot}</p>
                     </li>
                   ))}
                 </ul>
@@ -411,9 +449,7 @@ export const MobileScanPage: React.FC = () => {
             className="flex w-full min-h-[48px] items-center justify-center gap-2 rounded-xl bg-[#176B5B] px-5 text-sm font-semibold text-white active:scale-[0.99]"
           >
             <ClipboardCheck className="h-4 w-4" aria-hidden="true" />
-            <span>
-              {existingDraft ? 'Continuar inspeção' : 'Iniciar inspeção'}
-            </span>
+            <span>{existingDraft ? 'Continuar inspeção' : 'Iniciar inspeção'}</span>
           </Link>
         )}
       </div>

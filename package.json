@@ -9,8 +9,10 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "node --import tsx --test src/utils/domainLogic.test.ts src/utils/operations.test.ts src/utils/operations-review.test.ts",
-    "test:e2e": "playwright test"
+    "test": "node --import tsx --test src/utils/domainLogic.test.ts src/utils/operations.test.ts src/utils/operations-review.test.ts src/services/pilotClient.test.ts",
+    "test:backend": "node --import tsx --test server/pilot.test.ts server/runtime.test.ts",
+    "test:e2e": "playwright test",
+    "test:pilot": "playwright test --config playwright.pilot.config.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

@@ -1,0 +1,22 @@
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './tests/pilot',
+  outputDir: '.superpowers/pilot-test-results',
+  fullyParallel: false,
+  workers: 1,
+  timeout: 90_000,
+  expect: { timeout: 12_000 },
+  forbidOnly: Boolean(process.env.CI),
+  retries: 0,
+  reporter: 'list',
+  use: {
+    baseURL: process.env.PILOT_TEST_ORIGIN ?? 'http://127.0.0.1:8788',
+    browserName: 'chromium',
+    channel: process.env.PLAYWRIGHT_CHANNEL,
+    viewport: { width: 1440, height: 1000 },
+    screenshot: 'only-on-failure',
+    trace: 'retain-on-failure',
+    ...(process.env.PILOT_TEST_PROXY ? { proxy: { server: process.env.PILOT_TEST_PROXY } } : {}),
+  },
+});

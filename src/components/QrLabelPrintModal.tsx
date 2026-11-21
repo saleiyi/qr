@@ -4,6 +4,7 @@ import { Printer, X } from 'lucide-react';
 import type { Asset, Site } from '../types/domain';
 import { QrCodeDisplay } from './QrCodeDisplay';
 import { APP_CONFIG } from '../config/appConfig';
+import { equipmentScanUrl } from '../services/runtimeMode';
 
 interface QrLabelPrintModalProps {
   open: boolean;
@@ -26,8 +27,7 @@ export const QrLabelPrintModal: React.FC<QrLabelPrintModalProps> = ({
 
   if (!open) return null;
 
-  const siteNameOf = (siteId: string) =>
-    sites.find((s) => s.id === siteId)?.name ?? '';
+  const siteNameOf = (siteId: string) => sites.find((s) => s.id === siteId)?.name ?? '';
 
   const gridColsClass =
     labelSize === 'small'
@@ -36,8 +36,7 @@ export const QrLabelPrintModal: React.FC<QrLabelPrintModalProps> = ({
         ? 'grid-cols-1 sm:grid-cols-2'
         : 'grid-cols-1';
 
-  const qrPixelSize =
-    labelSize === 'small' ? 84 : labelSize === 'medium' ? 110 : 140;
+  const qrPixelSize = labelSize === 'small' ? 84 : labelSize === 'medium' ? 110 : 140;
 
   return (
     <Modal
@@ -72,9 +71,7 @@ export const QrLabelPrintModal: React.FC<QrLabelPrintModalProps> = ({
         <div className="no-print flex flex-wrap items-center justify-between gap-4 border-b border-[#DCE4EC] bg-[#F4F7FA] px-6 py-3">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-[#476078]">
-                Tamanho da etiqueta:
-              </span>
+              <span className="text-xs font-semibold text-[#476078]">Tamanho da etiqueta:</span>
               <div className="inline-flex rounded-lg border border-[#DCE4EC] bg-white p-0.5">
                 {[
                   { id: 'small' as const, label: 'Pequena (50×30mm)' },
@@ -133,7 +130,7 @@ export const QrLabelPrintModal: React.FC<QrLabelPrintModalProps> = ({
           <div className="mx-auto max-w-[210mm] rounded border border-[#DCE4EC] bg-white p-6 shadow-sm print:max-w-none print:border-none print:p-0 print:shadow-none">
             <div className={`grid gap-4 ${gridColsClass}`}>
               {assets.map((asset) => {
-                const scanUrl = `${window.location.origin}/a/${asset.id}`;
+                const scanUrl = equipmentScanUrl(asset.id);
                 return (
                   <div
                     key={asset.id}
@@ -163,9 +160,7 @@ export const QrLabelPrintModal: React.FC<QrLabelPrintModalProps> = ({
                         </p>
                       )}
                       {showSector && (
-                        <p className="truncate text-[11px] text-[#526980]">
-                          Setor: {asset.sector}
-                        </p>
+                        <p className="truncate text-[11px] text-[#526980]">Setor: {asset.sector}</p>
                       )}
                       <p className="mt-1.5 font-mono text-[10px] text-[#526980]">
                         Escaneie para ficha e inspeção

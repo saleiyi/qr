@@ -28,7 +28,7 @@ import type { InspectionPlan } from '../types/domain';
 const frequencyLabels = { daily: 'Diária', weekly: 'Semanal', monthly: 'Mensal' };
 type PlanDraft = Omit<InspectionPlan, 'id' | 'createdAt'>;
 export function PlansPage() {
-  const { effectiveState: state, demoSettings, savePlan } = useAppState();
+  const { effectiveState: state, demoSettings, savePlan, isPilot, identity } = useAppState();
   const today = APP_CONFIG.demoClockDate;
   const canPlan = demoSettings.activeDemoRole === 'admin';
   const [period, setPeriod] = useState('today');
@@ -357,7 +357,8 @@ export function PlansPage() {
                     Ver registro
                     <ArrowUpRight className="h-4 w-4" />
                   </Link>
-                ) : demoSettings.activeDemoRole !== 'viewer' ? (
+                ) : demoSettings.activeDemoRole !== 'viewer' &&
+                  (!isPilot || task.assigneeId === identity?.memberId) ? (
                   <Link
                     to={`/a/${asset.id}/inspect?taskId=${encodeURIComponent(task.id)}`}
                     className={`${primaryClass} shrink-0`}

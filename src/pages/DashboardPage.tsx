@@ -18,18 +18,12 @@ import {
   IssuePriorityLabel,
   IssueStatusBadge,
 } from '../components/StatusBadge';
-import {
-  computeAssetInspectionStatus,
-  getAssetOpenIssues,
-} from '../utils/domainLogic';
-import {
-  formatDateBR,
-  formatDateTimeBR,
-  formatRelativeDueBR,
-} from '../utils/date';
+import { computeAssetInspectionStatus, getAssetOpenIssues } from '../utils/domainLogic';
+import { formatDateBR, formatDateTimeBR, formatRelativeDueBR } from '../utils/date';
 
 export const DashboardPage: React.FC = () => {
-  const { effectiveState, stats } = useAppState();
+  const { effectiveState, stats, isPilot, identity } = useAppState();
+  const canManageAssets = !isPilot || identity?.role === 'admin';
 
   const priorityAssets = effectiveState.assets
     .filter((a) => {
@@ -44,17 +38,14 @@ export const DashboardPage: React.FC = () => {
     })
     .slice(0, 7);
 
-  const activeIssues = effectiveState.issues
-    .filter((i) => i.status !== 'resolved')
-    .slice(0, 5);
+  const activeIssues = effectiveState.issues.filter((i) => i.status !== 'resolved').slice(0, 5);
 
   const recentRecords = effectiveState.records.slice(0, 6);
 
   const siteNameOf = (siteId: string) =>
     effectiveState.sites.find((s) => s.id === siteId)?.name ?? siteId;
 
-  const assetOf = (assetId: string) =>
-    effectiveState.assets.find((a) => a.id === assetId);
+  const assetOf = (assetId: string) => effectiveState.assets.find((a) => a.id === assetId);
 
   const memberNameOf = (memberId: string) =>
     effectiveState.members.find((m) => m.id === memberId)?.name ?? 'Não atribuído';
@@ -64,17 +55,45 @@ export const DashboardPage: React.FC = () => {
       title="O que precisa de atenção hoje"
       subtitle={`Resumo calculado com base em ${stats.totalAssets} equipamentos e ${stats.totalRecordsCount} inspeções registradas`}
       primaryAction={
-        <Link
-          to="/app/assets?new=1"
-          className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg bg-[#176B5B] px-3.5 py-2 text-xs sm:text-sm font-semibold text-white hover:bg-[#125548] whitespace-nowrap"
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          <span>Novo equipamento</span>
-        </Link>
+        canManageAssets && (
+          <Link
+            to="/app/assets?new=1"
+            className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg bg-[#176B5B] px-3.5 py-2 text-xs sm:text-sm font-semibold text-white hover:bg-[#125548] whitespace-nowrap"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            <span>Novo equipamento</span>
+          </Link>
+        )
       }
     >
       {/* KPI Summary Cards — directly clickable to matching filtered views */}
-      <Link to="/app/plans" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#294968] bg-[#17324D] px-5 py-4 text-white"><div><p className="font-semibold">Agenda de inspeções</p><p className="mt-1 text-sm text-[#CBD7E4]">{effectiveState.tasks.filter(task=>task.status === 'pending' && task.dueDate <= APP_CONFIG.demoClockDate && effectiveState.assets.some(a=>a.id === task.assetId && a.operationalStatus !== 'inactive')).length} tarefa(s) para hoje ou atrasadas · {effectiveState.issues.filter(issue=>issue.status === 'awaiting_review').length} atendimento(s) aguardando verificação</p></div><span className="inline-flex min-h-[40px] items-center gap-2 text-sm font-semibold">Ver agenda<ArrowRight className="h-4 w-4" /></span></Link>
+      <Link
+        to="/app/plans"
+        className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#294968] bg-[#17324D] px-5 py-4 text-white"
+      >
+        <div>
+          <p className="font-semibold">Agenda de inspeções</p>
+          <p className="mt-1 text-sm text-[#CBD7E4]">
+            {
+              effectiveState.tasks.filter(
+                (task) =>
+                  task.status === 'pending' &&
+                  task.dueDate <= APP_CONFIG.demoClockDate &&
+                  effectiveState.assets.some(
+                    (a) => a.id === task.assetId && a.operationalStatus !== 'inactive',
+                  ),
+              ).length
+            }{' '}
+            tarefa(s) para hoje ou atrasadas ·{' '}
+            {effectiveState.issues.filter((issue) => issue.status === 'awaiting_review').length}{' '}
+            atendimento(s) aguardando verificação
+          </p>
+        </div>
+        <span className="inline-flex min-h-[40px] items-center gap-2 text-sm font-semibold">
+          Ver agenda
+          <ArrowRight className="h-4 w-4" />
+        </span>
+      </Link>
       <section aria-label="Indicadores operacionais">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Link
@@ -82,9 +101,7 @@ export const DashboardPage: React.FC = () => {
             className="group rounded-xl border border-[#DCE4EC] bg-white p-5 shadow-xs transition-all hover:border-[#B42318] hover:shadow-sm"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-[#526980]">
-                Inspeções atrasadas
-              </span>
+              <span className="text-xs font-semibold text-[#526980]">Inspeções atrasadas</span>
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FEF3F2] text-[#B42318]">
                 <AlertCircle className="h-4 w-4" aria-hidden="true" />
               </span>
@@ -124,9 +141,7 @@ export const DashboardPage: React.FC = () => {
             className="group rounded-xl border border-[#DCE4EC] bg-white p-5 shadow-xs transition-all hover:border-[#176B5B] hover:shadow-sm"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-[#526980]">
-                Pendências sem conclusão
-              </span>
+              <span className="text-xs font-semibold text-[#526980]">Pendências sem conclusão</span>
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#EDF3F8] text-[#17324D]">
                 <AlertTriangle className="h-4 w-4 text-[#B76A12]" aria-hidden="true" />
               </span>
@@ -147,9 +162,7 @@ export const DashboardPage: React.FC = () => {
             className="group rounded-xl border border-[#DCE4EC] bg-white p-5 shadow-xs transition-all hover:border-[#176B5B] hover:shadow-sm"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-[#526980]">
-                Sem primeira inspeção
-              </span>
+              <span className="text-xs font-semibold text-[#526980]">Sem primeira inspeção</span>
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#EAF4F1] text-[#176B5B]">
                 <MinusCircle className="h-4 w-4" aria-hidden="true" />
               </span>
@@ -158,7 +171,9 @@ export const DashboardPage: React.FC = () => {
               {stats.neverInspectedCount}
             </p>
             <p className="mt-2 flex items-center gap-1 text-xs font-medium text-[#476078] group-hover:text-[#17324D]">
-              <span>Ativos em dia: {stats.okCount} · Desativados: {stats.inactiveAssets}</span>
+              <span>
+                Ativos em dia: {stats.okCount} · Desativados: {stats.inactiveAssets}
+              </span>
               <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
             </p>
           </Link>
@@ -171,16 +186,19 @@ export const DashboardPage: React.FC = () => {
             Nenhum equipamento cadastrado no momento
           </h2>
           <p className="mt-1 text-sm text-[#476078]">
-            Cadastre o primeiro equipamento ou importe uma lista CSV para começar a acompanhar inspeções e pendências.
+            Cadastre o primeiro equipamento ou importe uma lista CSV para começar a acompanhar
+            inspeções e pendências.
           </p>
-          <div className="mt-5 flex justify-center gap-3">
-            <Link
-              to="/app/assets?new=1"
-              className="rounded-lg bg-[#176B5B] px-4 py-2 text-sm font-semibold text-white hover:bg-[#125548]"
-            >
-              Cadastrar equipamento
-            </Link>
-          </div>
+          {canManageAssets && (
+            <div className="mt-5 flex justify-center gap-3">
+              <Link
+                to="/app/assets?new=1"
+                className="rounded-lg bg-[#176B5B] px-4 py-2 text-sm font-semibold text-white hover:bg-[#125548]"
+              >
+                Cadastrar equipamento
+              </Link>
+            </div>
+          )}
         </section>
       ) : (
         <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-12">
@@ -205,10 +223,7 @@ export const DashboardPage: React.FC = () => {
 
             {priorityAssets.length === 0 ? (
               <div className="p-8 text-center">
-                <CheckCircle2
-                  className="mx-auto h-7 w-7 text-[#137333]"
-                  aria-hidden="true"
-                />
+                <CheckCircle2 className="mx-auto h-7 w-7 text-[#137333]" aria-hidden="true" />
                 <p className="mt-2 text-sm font-semibold text-[#17324D]">
                   Todas as inspeções programadas estão em dia
                 </p>
@@ -216,10 +231,7 @@ export const DashboardPage: React.FC = () => {
             ) : (
               <ul className="divide-y divide-[#DCE4EC]">
                 {priorityAssets.map((asset) => {
-                  const status = computeAssetInspectionStatus(
-                    asset,
-                    APP_CONFIG.demoClockDate,
-                  );
+                  const status = computeAssetInspectionStatus(asset, APP_CONFIG.demoClockDate);
                   const openIssuesCount = getAssetOpenIssues(
                     asset.id,
                     effectiveState.issues,
@@ -241,9 +253,7 @@ export const DashboardPage: React.FC = () => {
                         />
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2 text-xs text-[#526980]">
-                            <span className="font-mono font-bold text-[#17324D]">
-                              {asset.code}
-                            </span>
+                            <span className="font-mono font-bold text-[#17324D]">{asset.code}</span>
                             <span aria-hidden="true">·</span>
                             <span>{siteNameOf(asset.siteId)}</span>
                             <span aria-hidden="true">·</span>
@@ -292,12 +302,8 @@ export const DashboardPage: React.FC = () => {
             <section className="rounded-xl border border-[#DCE4EC] bg-white shadow-xs">
               <div className="flex items-center justify-between border-b border-[#DCE4EC] px-5 py-4">
                 <div>
-                  <h2 className="text-base font-bold text-[#17324D]">
-                    Pendências em aberto
-                  </h2>
-                  <p className="text-xs text-[#526980]">
-                    Não conformidades aguardando tratamento
-                  </p>
+                  <h2 className="text-base font-bold text-[#17324D]">Pendências em aberto</h2>
+                  <p className="text-xs text-[#526980]">Não conformidades aguardando tratamento</p>
                 </div>
                 <Link
                   to="/app/issues"
@@ -331,9 +337,7 @@ export const DashboardPage: React.FC = () => {
                         </Link>
                         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[#526980]">
                           <IssueStatusBadge status={issue.status} />
-                          <span className="tabular-nums">
-                            Prazo: {formatDateBR(issue.dueDate)}
-                          </span>
+                          <span className="tabular-nums">Prazo: {formatDateBR(issue.dueDate)}</span>
                         </div>
                       </li>
                     );
@@ -344,9 +348,7 @@ export const DashboardPage: React.FC = () => {
 
             <section className="rounded-xl border border-[#DCE4EC] bg-white shadow-xs">
               <div className="flex items-center justify-between border-b border-[#DCE4EC] px-5 py-4">
-                <h2 className="text-base font-bold text-[#17324D]">
-                  Atividade recente
-                </h2>
+                <h2 className="text-base font-bold text-[#17324D]">Atividade recente</h2>
                 <Link
                   to="/app/records"
                   className="text-xs font-semibold text-[#176B5B] hover:underline whitespace-nowrap"
@@ -367,9 +369,7 @@ export const DashboardPage: React.FC = () => {
                       </Link>
                       <span
                         className={`shrink-0 font-semibold ${
-                          rec.overallResult === 'approved'
-                            ? 'text-[#137333]'
-                            : 'text-[#B42318]'
+                          rec.overallResult === 'approved' ? 'text-[#137333]' : 'text-[#B42318]'
                         }`}
                       >
                         {rec.overallResult === 'approved'
