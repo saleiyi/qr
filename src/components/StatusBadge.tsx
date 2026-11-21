@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   AlertCircle,
+  ClipboardCheck,
   AlertTriangle,
   CheckCircle2,
   Clock,
@@ -86,6 +87,7 @@ export const InspectionStatusBadge: React.FC<{
 };
 
 export const IssueStatusBadge: React.FC<{ status: IssueStatus }> = ({ status }) => {
+  if (status === 'awaiting_review') return <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded border border-[#C8D7EA] bg-[#EEF3FA] px-2 py-0.5 text-xs font-medium text-[#355B88]"><ClipboardCheck className="h-3.5 w-3.5" aria-hidden="true" />Aguardando verificação</span>;
   if (status === 'open') {
     return (
       <span className="inline-flex items-center gap-1.5 rounded border border-[#F4C7C3] bg-[#FEF3F2] px-2 py-0.5 text-xs font-medium text-[#B42318] whitespace-nowrap">

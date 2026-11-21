@@ -1,3 +1,4 @@
+import { Modal } from './Modal';
 import React, { useState } from 'react';
 import {
   AlertCircle,
@@ -81,7 +82,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ open, onClose })
     downloadTextFile('modelo_importacao_ativos.csv', '\uFEFF' + SAMPLE_IMPORT_CSV);
   };
 
-  const handleConfirmImport = () => {
+  const handleConfirmImport = async () => {
     if (!validation) return;
     const validDrafts = validation.rows
       .filter((r) => r.errors.length === 0 && r.assetDraft)
@@ -89,7 +90,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ open, onClose })
 
     if (validDrafts.length === 0) return;
 
-    const res = importAssetsBatch(validDrafts);
+    const res = await importAssetsBatch(validDrafts);
     if (res.ok) {
       setImportedCount(res.importedCount);
       setStep(3);
@@ -97,11 +98,12 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ open, onClose })
   };
 
   return (
-    <div
+    <Modal
       className="no-print fixed inset-0 z-50 flex items-center justify-center bg-[#17324D]/45 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="csv-import-title"
+      onClose={handleClose}
     >
       <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl border border-[#DCE4EC] bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-[#DCE4EC] px-6 py-4">
@@ -325,6 +327,6 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ open, onClose })
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };

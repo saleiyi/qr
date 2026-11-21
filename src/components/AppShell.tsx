@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import { Modal } from './Modal';
+import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import {
   AlertTriangle,
+  CalendarDays,
   ClipboardCheck,
   FileSpreadsheet,
   LayoutDashboard,
@@ -27,6 +29,7 @@ interface AppShellProps {
 
 const NAV_ITEMS = [
   { to: '/app', label: t.nav.overview, icon: LayoutDashboard, end: true },
+  { to: '/app/plans', label: 'Planos e tarefas', icon: CalendarDays, end: false },
   { to: '/app/assets', label: t.nav.assets, icon: Wrench, end: false },
   { to: '/app/issues', label: t.nav.issues, icon: AlertTriangle, end: false },
   { to: '/app/records', label: t.nav.records, icon: FileSpreadsheet, end: false },
@@ -43,6 +46,16 @@ export const AppShell: React.FC<AppShellProps> = ({
   const { effectiveState, stats, demoSettings, setDemoRole } = useAppState();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+
+  useEffect(() => {
+    const desktop = window.matchMedia('(min-width: 1024px)');
+    const closeMobileMenu = () => {
+      if (desktop.matches) setMobileMenuOpen(false);
+    };
+    closeMobileMenu();
+    desktop.addEventListener('change', closeMobileMenu);
+    return () => desktop.removeEventListener('change', closeMobileMenu);
+  }, []);
 
   const renderNavLinks = (onNavigate?: () => void) => (
     <nav className="flex flex-col gap-1 px-3 py-4" aria-label="Menu principal do painel">
@@ -164,11 +177,12 @@ export const AppShell: React.FC<AppShellProps> = ({
 
       {/* Mobile Drawer Navigation */}
       {mobileMenuOpen && (
-        <div
+        <Modal
           className="no-print fixed inset-0 z-50 flex lg:hidden"
           role="dialog"
           aria-modal="true"
           aria-label="Navegação móvel"
+          onClose={() => setMobileMenuOpen(false)}
         >
           <div
             className="fixed inset-0 bg-[#0B1B2B]/60"
@@ -224,7 +238,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               </select>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Main Content Area */}
@@ -241,7 +255,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               <Menu className="h-5 w-5" />
             </button>
             <div className="min-w-0">
-              <h1 className="truncate text-lg font-bold tracking-tight text-[#17324D] sm:text-xl">
+              <h1 className="text-base font-bold leading-tight tracking-tight text-[#17324D] sm:text-xl sm:leading-normal">
                 {title}
               </h1>
               {subtitle && (

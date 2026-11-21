@@ -74,6 +74,7 @@ export const DashboardPage: React.FC = () => {
       }
     >
       {/* KPI Summary Cards — directly clickable to matching filtered views */}
+      <Link to="/app/plans" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#294968] bg-[#17324D] px-5 py-4 text-white"><div><p className="font-semibold">Agenda de inspeções</p><p className="mt-1 text-sm text-[#CBD7E4]">{effectiveState.tasks.filter(task=>task.status === 'pending' && task.dueDate <= APP_CONFIG.demoClockDate && effectiveState.assets.some(a=>a.id === task.assetId && a.operationalStatus !== 'inactive')).length} tarefa(s) para hoje ou atrasadas · {effectiveState.issues.filter(issue=>issue.status === 'awaiting_review').length} atendimento(s) aguardando verificação</p></div><span className="inline-flex min-h-[40px] items-center gap-2 text-sm font-semibold">Ver agenda<ArrowRight className="h-4 w-4" /></span></Link>
       <section aria-label="Indicadores operacionais">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Link

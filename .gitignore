@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+.npm-cache/
+test-results/
+playwright-report/
+.superpowers/
+.wrangler/
+.dev.vars*

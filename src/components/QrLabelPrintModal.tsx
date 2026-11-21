@@ -1,3 +1,4 @@
+import { Modal } from './Modal';
 import React, { useState } from 'react';
 import { Printer, X } from 'lucide-react';
 import type { Asset, Site } from '../types/domain';
@@ -39,11 +40,13 @@ export const QrLabelPrintModal: React.FC<QrLabelPrintModalProps> = ({
     labelSize === 'small' ? 84 : labelSize === 'medium' ? 110 : 140;
 
   return (
-    <div
+    <Modal
       className="fixed inset-0 z-50 flex items-center justify-center bg-[#17324D]/50 p-4 print:static print:block print:bg-white print:p-0"
       role="dialog"
       aria-modal="true"
       aria-labelledby="qr-batch-title"
+      onClose={onClose}
+      printable
     >
       <div className="print-container flex max-h-[92vh] w-full max-w-4xl flex-col rounded-xl border border-[#DCE4EC] bg-white shadow-2xl print:max-h-none print:border-none print:shadow-none">
         <div className="no-print flex items-center justify-between border-b border-[#DCE4EC] px-6 py-4">
@@ -175,6 +178,6 @@ export const QrLabelPrintModal: React.FC<QrLabelPrintModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };

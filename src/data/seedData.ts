@@ -11,6 +11,8 @@ import type {
   Site,
 } from '../types/domain';
 import { addDaysISODate } from '../utils/date';
+import { APP_CONFIG } from '../config/appConfig';
+import { generatePlanTasks } from '../utils/operations';
 
 const SITES: Site[] = [
   {
@@ -1036,6 +1038,10 @@ function generateSeedRecordsAndIssues(): {
 
 export function createInitialSeedData(): AppStateData {
   const { records, issues } = generateSeedRecordsAndIssues();
+  const plans:AppStateData['plans']=[
+    {id:'plan-ronda',name:'Ronda semanal de equipamentos',assetIds:ASSETS.slice(0,2).map(a=>a.id),templateId:TEMPLATES[0].id,assigneeId:MEMBERS.find(m=>m.role === 'operator')!.id,startDate:APP_CONFIG.demoClockDate,frequency:'weekly',createdAt:APP_CONFIG.demoClockISO},
+    {id:'plan-seguranca',name:'Verificação mensal de segurança',assetIds:[ASSETS[3].id],templateId:TEMPLATES[TEMPLATES.length-1].id,assigneeId:MEMBERS[0].id,startDate:addDaysISODate(APP_CONFIG.demoClockDate,-2),frequency:'monthly',createdAt:APP_CONFIG.demoClockISO},
+  ];
   return {
     company: {
       name: 'Metalúrgica & Logística Vale Verde Ltda.',
@@ -1050,5 +1056,8 @@ export function createInitialSeedData(): AppStateData {
     templates: TEMPLATES,
     records,
     issues,
+    plans,
+    tasks: plans.flatMap(plan=>generatePlanTasks(plan,addDaysISODate(APP_CONFIG.demoClockDate,90))),
+    templateDrafts: [],
   };
 }

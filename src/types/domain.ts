@@ -19,13 +19,13 @@ export type UserRole = 'admin' | 'operator' | 'viewer';
 
 export type MemberStatus = 'active' | 'inactive';
 
-export type IssueStatus = 'open' | 'in_progress' | 'resolved';
+export type IssueStatus = 'open' | 'in_progress' | 'awaiting_review' | 'resolved';
 
 export type IssuePriority = 'high' | 'medium' | 'low';
 
 export type ChecklistAnswerValue = 'conforming' | 'non_conforming' | 'na';
 
-export type TemplateItemType = 'check' | 'number';
+export type TemplateItemType = 'check' | 'number' | 'single_choice' | 'date';
 
 export interface Site {
   id: string;
@@ -84,10 +84,15 @@ export interface TemplateItem {
   required: boolean;
   photoRequired: boolean;
   photoRequiredOnFail?: boolean;
+  options?: string[];
+  min?: number;
+  max?: number;
+  visibleWhen?: { itemId: string; equals: string };
 }
 
 export interface ChecklistTemplate {
   id: string;
+  version?: number;
   name: string;
   category: EquipmentCategory | 'Geral';
   description: string;
@@ -103,6 +108,7 @@ export interface InspectionAnswer {
   unit?: string;
   status: ChecklistAnswerValue;
   numericValue?: string;
+  value?: string;
   note?: string;
   photoDataUrl?: string;
   photoName?: string;
@@ -110,6 +116,8 @@ export interface InspectionAnswer {
 
 export interface InspectionRecord {
   id: string;
+  taskId?: string;
+  templateVersion?: number;
   idempotencyKey?: string;
   assetId: string;
   assetCodeSnapshot: string;
@@ -131,8 +139,8 @@ export interface InspectionRecord {
 export interface Issue {
   id: string;
   assetId: string;
-  inspectionId: string;
-  itemId: string;
+  inspectionId?: string;
+  itemId?: string;
   title: string;
   description: string;
   priority: IssuePriority;
@@ -145,11 +153,56 @@ export interface Issue {
   resolutionNote?: string;
   resolvedAt?: string;
   resolvedById?: string;
+  reportedBy?: string;
+  treatmentPhotoDataUrl?: string;
+  treatmentPhotoName?: string;
+  timeline?: IssueEvent[];
+}
+
+export interface IssueEvent {
+  id: string;
+  at: string;
+  actorId: string;
+  label: string;
+  note?: string;
+  photoDataUrl?: string;
+  photoName?: string;
+  assigneeId?: string;
+  assigneeName?: string;
+  dueDate?: string;
+  priority?: IssuePriority;
+}
+
+export interface InspectionPlan {
+  id: string;
+  name: string;
+  assetIds: string[];
+  templateId: string;
+  assigneeId: string;
+  startDate: string;
+  frequency: 'daily' | 'weekly' | 'monthly';
+  createdAt: string;
+}
+
+export interface InspectionTask {
+  id: string;
+  planId: string;
+  planName: string;
+  assetId: string;
+  templateId: string;
+  assigneeId: string;
+  dueDate: string;
+  status: 'pending' | 'completed';
+  recordId?: string;
+  completedAt?: string;
 }
 
 export interface InspectionDraft {
   assetId: string;
+  taskId?: string;
   templateId: string;
+  templateVersion?: number;
+  questionSnapshot?: TemplateItem[];
   inspectorId: string;
   generalNotes: string;
   updatedAt: string;
@@ -158,6 +211,7 @@ export interface InspectionDraft {
     {
       status?: ChecklistAnswerValue;
       numericValue?: string;
+      value?: string;
       note?: string;
       photoDataUrl?: string;
       photoName?: string;
@@ -181,6 +235,8 @@ export interface DemoSettings {
 }
 
 export interface AppStateData {
+  revision?: string;
+  scheduleWarnings?: string[];
   company: CompanyProfile;
   sites: Site[];
   members: Member[];
@@ -188,6 +244,9 @@ export interface AppStateData {
   templates: ChecklistTemplate[];
   records: InspectionRecord[];
   issues: Issue[];
+  plans: InspectionPlan[];
+  tasks: InspectionTask[];
+  templateDrafts: ChecklistTemplate[];
 }
 
 export interface AssetFilterState {

@@ -223,6 +223,8 @@ export const MobileScanPage: React.FC = () => {
               </div>
 
               {/* Desktop inline CTA */}
+              {!isViewer && !isInactive && <Link to={`/a/${asset.id}/request`} className="mt-4 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-[#DCE4EC] bg-white px-4 text-sm font-semibold text-[#176B5B] hover:bg-[#EAF4F0]"><Wrench className="h-4 w-4" />Solicitar manutenção</Link>}
+              {state.tasks.some(task=>task.assetId === asset.id && task.status === 'pending') && <div className="mt-4 space-y-2 rounded-xl border border-[#DCE4EC] bg-white p-4"><h2 className="text-sm font-semibold">Inspeções programadas</h2>{state.tasks.filter(task=>task.assetId === asset.id && task.status === 'pending').sort((a,b)=>a.dueDate.localeCompare(b.dueDate)).slice(0,2).map(task=><Link key={task.id} to={isViewer?"/app/plans":`/a/${asset.id}/inspect?taskId=${encodeURIComponent(task.id)}`} className="block rounded-lg bg-[#F4F7FA] p-3 text-xs leading-relaxed text-[#17324D]"><strong>{task.planName}</strong><span className="mt-1 block text-[#526980]">{formatDateBR(task.dueDate)} · {isViewer?'Consultar na agenda':'Abrir inspeção'}</span></Link>)}<Link to="/app/plans" className="block min-h-[36px] pt-2 text-xs font-semibold text-[#176B5B]">Ver agenda completa</Link></div>}
               <div className="mt-4 hidden md:block">
                 {isViewer ? (
                   <div className="flex items-center gap-2 rounded-xl border border-[#DCE4EC] bg-[#F4F7FA] px-4 py-3 text-xs text-[#476078]">

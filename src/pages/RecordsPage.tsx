@@ -1,3 +1,4 @@
+import { Modal } from '../components/Modal';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
@@ -12,7 +13,7 @@ import { AppShell } from '../components/AppShell';
 import { formatDateBR, formatDateTimeBR } from '../utils/date';
 import { buildRecordsCsv, downloadTextFile } from '../utils/csv';
 import type { InspectionRecord } from '../types/domain';
-import { APP_CONFIG } from '../config/appConfig';
+import { InspectionReport } from '../components/InspectionReport';
 
 export const RecordsPage: React.FC = () => {
   const { effectiveState, addToast } = useAppState();
@@ -330,11 +331,12 @@ export const RecordsPage: React.FC = () => {
 
       {/* Inspection Record Detail Drawer */}
       {selectedRecord && (
-        <div
+        <Modal
           className="no-print fixed inset-0 z-50 flex justify-end bg-[#17324D]/45"
           role="dialog"
           aria-modal="true"
           aria-labelledby="record-detail-title"
+          onClose={closeRecordDrawer}
         >
           <div className="fixed inset-0" onClick={closeRecordDrawer} />
           <div className="relative z-10 flex h-full w-full max-w-xl flex-col bg-white shadow-2xl">
@@ -446,6 +448,7 @@ export const RecordsPage: React.FC = () => {
                           Leitura: {ans.numericValue} {ans.unit}
                         </p>
                       )}
+                      {ans.value && <p className="mt-1 font-medium text-[#35506B]">Resposta: {ans.type === 'date'?formatDateBR(ans.value):ans.value}</p>}
                       {ans.note && (
                         <p className="mt-1 text-[#B42318]">Obs.: {ans.note}</p>
                       )}
@@ -463,16 +466,18 @@ export const RecordsPage: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Printable Report View (A4 Print / Save as PDF) */}
       {printReportOpen && (
-        <div
+        <Modal
           className="fixed inset-0 z-50 flex items-center justify-center bg-[#17324D]/50 p-4 print:static print:block print:bg-white print:p-0"
           role="dialog"
           aria-modal="true"
           aria-labelledby="print-report-title"
+          onClose={() => setPrintReportOpen(false)}
+          printable
         >
           <div className="print-container flex max-h-[92vh] w-full max-w-4xl flex-col rounded-xl border border-[#DCE4EC] bg-white shadow-2xl print:max-h-none print:border-none print:shadow-none">
             <div className="no-print flex items-center justify-between border-b border-[#DCE4EC] px-6 py-4">
@@ -508,127 +513,17 @@ export const RecordsPage: React.FC = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 print:overflow-visible print:p-0">
-              <div className="mx-auto max-w-[210mm] space-y-6 bg-white">
-                {/* Report Header */}
-                <div className="flex items-start justify-between border-b-2 border-[#17324D] pb-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#526980]">
-                      Relatório de Inspeções de Equipamentos · {APP_CONFIG.demoLabel}
-                    </p>
-                    <h3 className="mt-1 text-xl font-bold text-[#17324D]">
-                      {effectiveState.company.name}
-                    </h3>
-                    <p className="text-xs text-[#476078]">
-                      CNPJ {effectiveState.company.cnpj} · {effectiveState.company.city}
-                    </p>
-                  </div>
-                  <div className="text-right text-xs text-[#476078] tabular-nums">
-                    <p>Emissão: {formatDateBR(APP_CONFIG.demoClockDate)}</p>
-                    <p>Registros incluídos: {filteredRecords.length}</p>
-                    {(dateFrom || dateTo) && (
-                      <p>
-                        Período: {dateFrom ? formatDateBR(dateFrom) : 'Início'} até{' '}
-                        {dateTo ? formatDateBR(dateTo) : 'Atual'}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Records Summary Table */}
-                <div className="space-y-4">
-                  {filteredRecords.slice(0, 20).map((rec) => {
-                    const relatedIssues = effectiveState.issues.filter(
-                      (i) => i.inspectionId === rec.id,
-                    );
-                    return (
-                      <div
-                        key={rec.id}
-                        className="print-avoid-break rounded-lg border border-[#DCE4EC] p-4 text-xs"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#DCE4EC] pb-2">
-                          <div>
-                            <span className="font-mono font-bold text-[#17324D]">
-                              {rec.assetCodeSnapshot}
-                            </span>{' '}
-                            —{' '}
-                            <strong className="text-sm text-[#17324D]">
-                              {rec.assetNameSnapshot}
-                            </strong>
-                            <p className="text-[#526980]">
-                              {siteNameOf(rec.siteIdSnapshot)} · Modelo:{' '}
-                              {rec.templateNameSnapshot}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <span
-                              className={`font-semibold ${
-                                rec.overallResult === 'approved'
-                                  ? 'text-[#137333]'
-                                  : 'text-[#B42318]'
-                              }`}
-                            >
-                              {rec.overallResult === 'approved'
-                                ? 'Aprovada'
-                                : `Com pendências (${rec.nonConformingCount})`}
-                            </span>
-                            <p className="font-mono text-[#526980] tabular-nums">
-                              {formatDateTimeBR(rec.submittedAt)} · {rec.inspectorNameSnapshot}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2">
-                          {rec.answers.map((ans) => (
-                            <div
-                              key={ans.itemId}
-                              className="flex items-center justify-between gap-2 rounded bg-[#F4F7FA] px-2.5 py-1.5"
-                            >
-                              <span className="truncate text-[#17324D]">
-                                {ans.label}
-                                {ans.numericValue
-                                  ? ` (${ans.numericValue} ${ans.unit ?? ''})`
-                                  : ''}
-                              </span>
-                              <span
-                                className={`shrink-0 font-semibold ${
-                                  ans.status === 'conforming'
-                                    ? 'text-[#137333]'
-                                    : ans.status === 'non_conforming'
-                                      ? 'text-[#B42318]'
-                                      : 'text-[#526980]'
-                                }`}
-                              >
-                                {ans.status === 'conforming'
-                                  ? 'OK'
-                                  : ans.status === 'non_conforming'
-                                    ? 'Não conf.'
-                                    : 'N/A'}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-
-                        {relatedIssues.length > 0 && (
-                          <div className="mt-2 border-t border-[#DCE4EC] pt-2">
-                            {relatedIssues.map((iss) => (
-                              <p key={iss.id} className="text-[#476078]">
-                                <strong>Pendência ({iss.status === 'resolved' ? 'Resolvida' : 'Aberta'}):</strong>{' '}
-                                {iss.description}
-                                {iss.resolutionNote
-                                  ? ` — Tratamento: ${iss.resolutionNote}`
-                                  : ''}
-                              </p>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <InspectionReport
+                records={filteredRecords}
+                company={effectiveState.company}
+                sites={effectiveState.sites}
+                issues={effectiveState.issues}
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+              />
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </AppShell>
   );

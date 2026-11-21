@@ -414,6 +414,7 @@ export const AssetDetailPage: React.FC = () => {
                                           Leitura: {ans.numericValue} {ans.unit}
                                         </p>
                                       )}
+                                      {ans.value && <p className="mt-1 text-[#476078]">Resposta: {ans.type === 'date'?formatDateBR(ans.value):ans.value}</p>}
                                       {ans.note && (
                                         <p className="mt-0.5 text-[#B42318]">
                                           Obs.: {ans.note}
