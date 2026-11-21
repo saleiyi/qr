@@ -47,5 +47,7 @@ account. Keep demo storage browser-local and retain the current app routes.
 - [x] User chose manual purchase; prepare the free zone and provide its two NS.
       Do not execute the earlier authorized purchase; it has been superseded.
 - [x] Associate apex/www with Pages and write/read back both proxied CNAME records.
-- [ ] After the user completes purchase/delegation, verify public NS and TLS,
+- [x] After the user completes purchase/delegation, verify public NS and TLS,
       add canonical metadata/sitemap and redeploy.
+- [x] Verify Full strict, HTTP -> HTTPS and www -> apex with path/query preservation.
+- [x] Repeat the browser-local save and reload check on the working custom origin.

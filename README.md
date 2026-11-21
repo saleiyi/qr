@@ -5,6 +5,9 @@ printable reports. This is a frontend prototype: application data and inspection
 drafts stay in the current browser's local storage. It does not provide backend
 accounts, payments, or synchronization between devices.
 
+Public demo: [tagronda.com](https://tagronda.com). The `www` hostname redirects to
+the primary HTTPS domain while preserving equipment links and query parameters.
+
 ## Development
 
 Install Node.js and Bun, then use the existing lockfile:
