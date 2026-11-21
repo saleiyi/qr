@@ -1,4 +1,4 @@
-# Ativos frontend demonstration
+# Tagronda frontend demonstration
 
 Portuguese equipment records, QR labels, inspections, issue treatment, and
 printable reports. This is a frontend prototype: application data and inspection
@@ -41,6 +41,13 @@ mobile menu resizing, submission/issue treatment, and 375px/768px/1440px layouts
 
 `bun run build` produces `dist/`. Static hosting must serve `index.html` as the
 fallback for application paths such as `/app/assets/eq-001` and `/a/eq-001`.
+
+The Cloudflare Pages project is `tagronda`. Its native SPA fallback serves these
+routes; do not add a root `404.html` without replacing that fallback. Deploy the
+built directory using `wrangler pages deploy dist --project-name tagronda
+--branch main` with credentials supplied through the environment. No credentials
+belong in this repository. See [the launch record](docs/LAUNCH.md) for domain and
+deployment status.
 
 Drafts and demo data are browser-local. Use the reset action in Settings to return
 to the initial examples. Failed saves preserve current input and display a retry

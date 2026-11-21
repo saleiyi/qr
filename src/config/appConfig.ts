@@ -10,7 +10,7 @@ export interface DemoPlan {
 }
 
 export const APP_CONFIG = {
-  brandName: 'Ativos',
+  brandName: 'Tagronda',
   brandTagline: 'Gestão de equipamentos e inspeções',
   demoLabel: 'Demonstração',
   defaultLocale: 'pt-BR' as const,
