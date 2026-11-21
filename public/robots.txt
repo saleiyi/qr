@@ -1,5 +1,9 @@
 User-agent: *
 Disallow: /app
 Disallow: /a/
+Disallow: /demo
+Disallow: /login
+Disallow: /activate
+Disallow: /api/
 
 Sitemap: https://tagronda.com/sitemap.xml

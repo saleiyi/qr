@@ -54,7 +54,7 @@ function fingerprintDraft(draft: Omit<InspectionDraft, 'updatedAt'>): string {
 const EditableInspectionFormPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { state, demoSettings, submitInspection, addToast } = useAppState();
+  const { state, demoSettings, submitInspection, addToast, isPilot, identity } = useAppState();
   const [searchParams] = useSearchParams();
   const taskId = searchParams.get('taskId') ?? undefined;
   const task = state.tasks.find((t) => t.id === taskId && t.assetId === id);
@@ -66,10 +66,11 @@ const EditableInspectionFormPage: React.FC = () => {
     : undefined;
 
   const activeInspectors = state.members.filter(
-    (m) => m.status === 'active' && m.role !== 'viewer',
+    (m) =>
+      m.status === 'active' && m.role !== 'viewer' && (!isPilot || m.id === identity?.memberId),
   );
   const defaultInspectorId =
-    task?.assigneeId ?? activeInspectors[0]?.id ?? state.members[0]?.id ?? '';
+    identity?.memberId ?? task?.assigneeId ?? activeInspectors[0]?.id ?? state.members[0]?.id ?? '';
 
   const [inspectorId, setInspectorId] = useState(defaultInspectorId);
   const [generalNotes, setGeneralNotes] = useState('');
@@ -186,7 +187,7 @@ const EditableInspectionFormPage: React.FC = () => {
           ...archived.filter((draft) => draft.updatedAt !== saved.updatedAt),
         ]);
       setGeneralNotes(saved.generalNotes ?? '');
-      if (saved.inspectorId) setInspectorId(saved.inspectorId);
+      if (saved.inspectorId) setInspectorId(identity?.memberId ?? saved.inspectorId);
       setLastSavedFingerprint(fingerprintDraft(saved));
       setDraftSaveState('saved');
       setDraftRestoredNotice(
@@ -597,6 +598,7 @@ const EditableInspectionFormPage: React.FC = () => {
               </label>
               <select
                 id="inspector-select"
+                disabled={isPilot}
                 value={inspectorId}
                 onChange={(e) => setInspectorId(e.target.value)}
                 className="mt-1 w-full min-h-[44px] rounded-lg border border-[#DCE4EC] bg-white px-3 text-sm text-[#17324D]"
@@ -664,7 +666,12 @@ const EditableInspectionFormPage: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmitInspection} noValidate className="mt-5 space-y-5">
+        <form
+          onSubmit={handleSubmitInspection}
+          data-cloud-command="inspection.submit"
+          noValidate
+          className="mt-5 space-y-5"
+        >
           <ChecklistFields
             template={template}
             answers={answers}

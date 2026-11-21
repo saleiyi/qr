@@ -9,12 +9,12 @@ import type { IssuePriority, Issue } from '../types/domain';
 
 export function RepairRequestForm() {
   const { id } = useParams();
-  const { state, createRepairRequest, demoSettings } = useAppState();
+  const { state, createRepairRequest, demoSettings, isPilot, identity } = useAppState();
   const asset = state.assets.find((a) => a.id === id);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<IssuePriority>('medium');
-  const [reportedBy, setReportedBy] = useState('');
+  const [reportedBy, setReportedBy] = useState(isPilot ? (identity?.name ?? '') : '');
   const [photo, setPhoto] = useState<string>();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +56,7 @@ export function RepairRequestForm() {
             Ficha do equipamento
           </Link>
           <span className="rounded border border-[#DCE4EC] px-2 py-1 text-xs text-[#526980]">
-            Demonstração
+            {isPilot ? 'Empresa' : 'Demonstração'}
           </span>
         </div>
       </header>
@@ -67,7 +67,7 @@ export function RepairRequestForm() {
             <h1 className="mt-4 text-2xl font-bold">Solicitação registrada</h1>
             <p className="mt-3 text-sm leading-relaxed text-[#526980]">
               A solicitação foi vinculada ao equipamento {asset.code} e está aguardando atribuição
-              nesta demonstração.
+              {isPilot ? 'pela equipe da sua empresa.' : 'nesta demonstração.'}
             </p>
             <p className="mt-4 break-all rounded-lg bg-[#F4F7FA] p-3 text-xs text-[#526980]">
               Protocolo: {result.id}
@@ -93,6 +93,7 @@ export function RepairRequestForm() {
               </div>
             </div>
             <form
+              data-cloud-command="request.create"
               className="space-y-5 rounded-2xl border border-[#DCE4EC] bg-white p-5"
               onSubmit={async (event) => {
                 event.preventDefault();
@@ -197,7 +198,9 @@ export function RepairRequestForm() {
                 Enviar solicitação
               </button>
               <p className="text-center text-xs leading-relaxed text-[#526980]">
-                O registro fica salvo neste navegador. Nenhuma mensagem externa será enviada.
+                {isPilot
+                  ? 'O registro fica salvo na empresa e pode ser acompanhado pela equipe no painel.'
+                  : 'O registro fica salvo neste navegador. Nenhuma mensagem externa será enviada.'}
               </p>
             </form>
           </>

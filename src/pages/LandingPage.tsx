@@ -12,16 +12,14 @@ import {
   Wrench,
 } from 'lucide-react';
 import { APP_CONFIG } from '../config/appConfig';
+import { demoHref } from '../services/runtimeMode';
 import { useAppState } from '../context/AppStateContext';
 import { formatBRL, formatDateBR, formatRelativeDueBR } from '../utils/date';
 import { computeAssetInspectionStatus } from '../utils/domainLogic';
 import { AssetIllustration } from '../components/AssetIllustration';
 import { InspectionGuideSection } from '../components/InspectionGuideSection';
 import { QrCodeDisplay } from '../components/QrCodeDisplay';
-import {
-  InspectionStatusBadge,
-  OperationalStatusBadge,
-} from '../components/StatusBadge';
+import { InspectionStatusBadge, OperationalStatusBadge } from '../components/StatusBadge';
 
 const FAQS = [
   {
@@ -50,26 +48,20 @@ export const LandingPage: React.FC = () => {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
   const [selectedPlanNotice, setSelectedPlanNotice] = useState<string | null>(null);
 
-  const heroAssets = HERO_EQUIPMENT_IDS.map((id) =>
-    state.assets.find((a) => a.id === id),
-  ).filter((a): a is NonNullable<typeof a> => Boolean(a));
-
-  const selectableAssets =
-    heroAssets.length > 0 ? heroAssets : state.assets.slice(0, 3);
-
-  const previewAsset =
-    state.assets.find((a) => a.id === previewAssetId) ?? selectableAssets[0];
-  const previewSite = state.sites.find((s) => s.id === previewAsset?.siteId);
-  const previewTemplate = state.templates.find(
-    (t) => t.id === previewAsset?.templateId,
+  const heroAssets = HERO_EQUIPMENT_IDS.map((id) => state.assets.find((a) => a.id === id)).filter(
+    (a): a is NonNullable<typeof a> => Boolean(a),
   );
+
+  const selectableAssets = heroAssets.length > 0 ? heroAssets : state.assets.slice(0, 3);
+
+  const previewAsset = state.assets.find((a) => a.id === previewAssetId) ?? selectableAssets[0];
+  const previewSite = state.sites.find((s) => s.id === previewAsset?.siteId);
+  const previewTemplate = state.templates.find((t) => t.id === previewAsset?.templateId);
   const previewStatus = previewAsset
     ? computeAssetInspectionStatus(previewAsset, APP_CONFIG.demoClockDate)
     : 'ok';
   const previewOpenIssues = previewAsset
-    ? state.issues.filter(
-        (i) => i.assetId === previewAsset.id && i.status !== 'resolved',
-      )
+    ? state.issues.filter((i) => i.assetId === previewAsset.id && i.status !== 'resolved')
     : [];
 
   return (
@@ -118,12 +110,12 @@ export const LandingPage: React.FC = () => {
           </nav>
 
           <div className="shrink-0">
-            <Link
-              to="/app"
+            <a
+              href="/login"
               className="inline-flex min-h-[40px] items-center justify-center rounded-lg bg-[#176B5B] px-4 py-2 text-xs sm:text-sm font-semibold text-white hover:bg-[#1D836F] whitespace-nowrap shrink-0"
             >
-              Explorar demonstração
-            </Link>
+              Entrar
+            </a>
           </div>
         </div>
       </header>
@@ -142,8 +134,7 @@ export const LandingPage: React.FC = () => {
         <div
           className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full opacity-25 blur-3xl"
           style={{
-            background:
-              'radial-gradient(circle, rgba(23,107,91,0.85) 0%, rgba(14,34,53,0) 70%)',
+            background: 'radial-gradient(circle, rgba(23,107,91,0.85) 0%, rgba(14,34,53,0) 70%)',
           }}
         />
 
@@ -157,35 +148,32 @@ export const LandingPage: React.FC = () => {
               Histórico e inspeções de cada equipamento, em um só lugar.
             </h1>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-[#CBD7E4] sm:text-lg">
-              Cole etiquetas QR em chillers, compressores, quadros elétricos e
-              empilhadeiras. O técnico escaneia no navegador do celular, executa
-              o checklist e registra fotos; a gestão acompanha atrasos e
-              pendências no painel.
+              Cole etiquetas QR em chillers, compressores, quadros elétricos e empilhadeiras. O
+              técnico escaneia no navegador do celular, executa o checklist e registra fotos; a
+              gestão acompanha atrasos e pendências no painel.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3.5">
-              <Link
-                to="/app"
+              <a
+                href={demoHref('/app')}
                 className="inline-flex min-h-[48px] items-center gap-2 rounded-xl bg-[#176B5B] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#081522]/40 hover:bg-[#1D836F] whitespace-nowrap"
               >
                 <span>Explorar demonstração</span>
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-              <Link
-                to="/a/eq-001"
+              </a>
+              <a
+                href={demoHref('/a/eq-001')}
                 className="inline-flex min-h-[48px] items-center gap-2 rounded-xl border border-[#3B5B78] bg-[#17324D]/75 px-5 py-3 text-sm font-semibold text-white hover:bg-[#1E4060] whitespace-nowrap"
               >
                 <Smartphone className="h-4 w-4 text-[#5EEAD4]" aria-hidden="true" />
                 <span>Abrir ficha no celular</span>
-              </Link>
+              </a>
             </div>
 
             <div className="mt-9 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-[#26435E] pt-5 text-xs text-[#9FB5CA]">
               <span>
                 Exemplo:{' '}
-                <strong className="font-semibold text-white">
-                  {state.company.tradeName}
-                </strong>
+                <strong className="font-semibold text-white">{state.company.tradeName}</strong>
               </span>
               <span aria-hidden="true">·</span>
               <span className="font-mono tabular-nums text-[#E2EBF3]">
@@ -235,9 +223,7 @@ export const LandingPage: React.FC = () => {
                     <div>
                       <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#526980]">
                         <span>Placa do ativo</span>
-                        <span className="font-mono text-[#17324D]">
-                          {previewAsset.code}
-                        </span>
+                        <span className="font-mono text-[#17324D]">{previewAsset.code}</span>
                       </div>
                       <AssetIllustration
                         category={previewAsset.category}
@@ -259,7 +245,7 @@ export const LandingPage: React.FC = () => {
 
                     <div className="flex items-center justify-between gap-3 rounded-lg border border-[#CBD7E4] bg-white p-2.5">
                       <QrCodeDisplay
-                        value={`${window.location.origin}/a/${previewAsset.id}`}
+                        value={`${window.location.origin}${demoHref(`/a/${previewAsset.id}`)}`}
                         size={68}
                         label={`QR de ${previewAsset.code}`}
                       />
@@ -284,9 +270,7 @@ export const LandingPage: React.FC = () => {
                         <span className="font-semibold text-[#176B5B]">
                           Ficha após leitura do QR
                         </span>
-                        <span className="font-mono text-[11px]">
-                          {previewAsset.category}
-                        </span>
+                        <span className="font-mono text-[11px]">{previewAsset.category}</span>
                       </div>
                       <h2 className="mt-1.5 text-base font-bold leading-snug text-[#17324D]">
                         {previewAsset.name}
@@ -296,9 +280,7 @@ export const LandingPage: React.FC = () => {
                       </p>
 
                       <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <OperationalStatusBadge
-                          status={previewAsset.operationalStatus}
-                        />
+                        <OperationalStatusBadge status={previewAsset.operationalStatus} />
                         <InspectionStatusBadge status={previewStatus} />
                       </div>
 
@@ -336,9 +318,7 @@ export const LandingPage: React.FC = () => {
                               key={item.id}
                               className="flex items-center justify-between gap-2 rounded-md border border-[#DCE4EC] px-2.5 py-1.5 text-xs"
                             >
-                              <span className="truncate text-[#17324D]">
-                                {item.label}
-                              </span>
+                              <span className="truncate text-[#17324D]">{item.label}</span>
                               <CheckCircle2
                                 className="h-3.5 w-3.5 shrink-0 text-[#176B5B]"
                                 aria-hidden="true"
@@ -350,19 +330,19 @@ export const LandingPage: React.FC = () => {
                     </div>
 
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[#DCE4EC] pt-3">
-                      <Link
-                        to={`/app/assets/${previewAsset.id}`}
+                      <a
+                        href={demoHref(`/app/assets/${previewAsset.id}`)}
                         className="text-xs font-semibold text-[#17324D] hover:text-[#176B5B] hover:underline"
                       >
                         Ficha no painel →
-                      </Link>
-                      <Link
-                        to={`/a/${previewAsset.id}/inspect`}
+                      </a>
+                      <a
+                        href={demoHref(`/a/${previewAsset.id}/inspect`)}
                         className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg bg-[#176B5B] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#125548] whitespace-nowrap"
                       >
                         <ClipboardCheck className="h-3.5 w-3.5" aria-hidden="true" />
                         Iniciar inspeção agora
-                      </Link>
+                      </a>
                     </div>
                   </div>
                 </div>
@@ -385,8 +365,8 @@ export const LandingPage: React.FC = () => {
             Do código colado na máquina até o relatório arquivado
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-[#476078]">
-            Um fluxo direto para equipes de manutenção que hoje dependem de
-            planilhas soltas ou formulários em papel.
+            Um fluxo direto para equipes de manutenção que hoje dependem de planilhas soltas ou
+            formulários em papel.
           </p>
         </div>
 
@@ -396,16 +376,14 @@ export const LandingPage: React.FC = () => {
               <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#EAF4F1] text-[#176B5B]">
                 <QrCode className="h-5 w-5" aria-hidden="true" />
               </span>
-              <span className="font-mono text-xs font-bold text-[#526980]">
-                ETAPA 01
-              </span>
+              <span className="font-mono text-xs font-bold text-[#526980]">ETAPA 01</span>
             </div>
             <h3 className="mt-4 text-base font-bold text-[#17324D]">
               Cadastre ou importe via CSV e imprima em A4
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-[#476078]">
-              Suba sua lista de equipamentos em CSV com validação linha a linha,
-              gere etiquetas com QR Code real e fixe no painel de cada ativo.
+              Suba sua lista de equipamentos em CSV com validação linha a linha, gere etiquetas com
+              QR Code real e fixe no painel de cada ativo.
             </p>
           </div>
 
@@ -414,17 +392,14 @@ export const LandingPage: React.FC = () => {
               <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#EAF4F1] text-[#176B5B]">
                 <Smartphone className="h-5 w-5" aria-hidden="true" />
               </span>
-              <span className="font-mono text-xs font-bold text-[#526980]">
-                ETAPA 02
-              </span>
+              <span className="font-mono text-xs font-bold text-[#526980]">ETAPA 02</span>
             </div>
             <h3 className="mt-4 text-base font-bold text-[#17324D]">
               Identificação imediata e checklist no celular
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-[#476078]">
-              O técnico abre a ficha móvel, confere o código e pendências
-              anteriores, responde conforme ou não conforme e anexa foto da
-              ocorrência.
+              O técnico abre a ficha móvel, confere o código e pendências anteriores, responde
+              conforme ou não conforme e anexa foto da ocorrência.
             </p>
           </div>
 
@@ -433,26 +408,21 @@ export const LandingPage: React.FC = () => {
               <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#EAF4F1] text-[#176B5B]">
                 <FileSpreadsheet className="h-5 w-5" aria-hidden="true" />
               </span>
-              <span className="font-mono text-xs font-bold text-[#526980]">
-                ETAPA 03
-              </span>
+              <span className="font-mono text-xs font-bold text-[#526980]">ETAPA 03</span>
             </div>
             <h3 className="mt-4 text-base font-bold text-[#17324D]">
               Pendências rastreadas e relatórios em CSV ou PDF
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-[#476078]">
-              Itens reprovados abrem pendências ligadas à inspeção original.
-              Exporte registros filtrados ou imprima relatórios formatados em A4.
+              Itens reprovados abrem pendências ligadas à inspeção original. Exporte registros
+              filtrados ou imprima relatórios formatados em A4.
             </p>
           </div>
         </div>
       </section>
 
       {/* Capabilities & Use Cases */}
-      <section
-        id="recursos"
-        className="border-y border-[#DCE4EC] bg-white py-16"
-      >
+      <section id="recursos" className="border-y border-[#DCE4EC] bg-white py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
             <div className="lg:col-span-5">
@@ -463,9 +433,8 @@ export const LandingPage: React.FC = () => {
                 Pensado para a rotina real de oficinas, galpões e prédios
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-[#476078]">
-                Separação clara entre o estado operacional do equipamento, o
-                prazo da próxima inspeção e as pendências abertas — sem mascarar
-                problemas não resolvidos.
+                Separação clara entre o estado operacional do equipamento, o prazo da próxima
+                inspeção e as pendências abertas — sem mascarar problemas não resolvidos.
               </p>
 
               <div className="mt-6 space-y-4 border-t border-[#DCE4EC] pt-6 text-sm">
@@ -492,11 +461,12 @@ export const LandingPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <FileSpreadsheet className="mt-0.5 h-4 w-4 shrink-0 text-[#176B5B]" aria-hidden="true" />
+                  <FileSpreadsheet
+                    className="mt-0.5 h-4 w-4 shrink-0 text-[#176B5B]"
+                    aria-hidden="true"
+                  />
                   <div>
-                    <p className="font-semibold text-[#17324D]">
-                      Gestão predial e multiunidades
-                    </p>
+                    <p className="font-semibold text-[#17324D]">Gestão predial e multiunidades</p>
                     <p className="text-xs text-[#476078]">
                       Filtre pendências por unidade, responsável e período com exportação direta.
                     </p>
@@ -507,12 +477,10 @@ export const LandingPage: React.FC = () => {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:col-span-7">
               <div className="rounded-xl border border-[#DCE4EC] bg-[#F4F7FA] p-5">
-                <h3 className="text-sm font-bold text-[#17324D]">
-                  Rascunho automático no campo
-                </h3>
+                <h3 className="text-sm font-bold text-[#17324D]">Rascunho automático no campo</h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-[#476078]">
-                  Se o operador fechar o navegador durante a inspeção, o rascunho
-                  é recuperado ao voltar ao equipamento.
+                  Se o operador fechar o navegador durante a inspeção, o rascunho é recuperado ao
+                  voltar ao equipamento.
                 </p>
               </div>
               <div className="rounded-xl border border-[#DCE4EC] bg-[#F4F7FA] p-5">
@@ -520,17 +488,15 @@ export const LandingPage: React.FC = () => {
                   Histórico imutável de respostas
                 </h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-[#476078]">
-                  Editar um modelo de checklist hoje nunca altera as perguntas e
-                  respostas gravadas em inspeções passadas.
+                  Editar um modelo de checklist hoje nunca altera as perguntas e respostas gravadas
+                  em inspeções passadas.
                 </p>
               </div>
               <div className="rounded-xl border border-[#DCE4EC] bg-[#F4F7FA] p-5">
-                <h3 className="text-sm font-bold text-[#17324D]">
-                  Importação CSV transparente
-                </h3>
+                <h3 className="text-sm font-bold text-[#17324D]">Importação CSV transparente</h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-[#476078]">
-                  Linhas inválidas ou códigos duplicados são apontados antes de
-                  gravar qualquer registro na lista.
+                  Linhas inválidas ou códigos duplicados são apontados antes de gravar qualquer
+                  registro na lista.
                 </p>
               </div>
               <div className="rounded-xl border border-[#DCE4EC] bg-[#F4F7FA] p-5">
@@ -538,8 +504,8 @@ export const LandingPage: React.FC = () => {
                   Etiquetas e relatórios prontos para impressão
                 </h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-[#476078]">
-                  Estilos de impressão dedicados ocultam menus e organizam os
-                  dados em página A4 limpa para salvar em PDF.
+                  Estilos de impressão dedicados ocultam menus e organizam os dados em página A4
+                  limpa para salvar em PDF.
                 </p>
               </div>
             </div>
@@ -555,7 +521,8 @@ export const LandingPage: React.FC = () => {
               Planos de referência (Demonstração)
             </h2>
             <p className="mt-1.5 text-sm text-[#476078]">
-              Valores em R$ exibidos apenas para ilustrar o modelo comercial do protótipo — sem cobrança ou envio de pedido.
+              Valores em R$ exibidos apenas para ilustrar o modelo comercial do protótipo — sem
+              cobrança ou envio de pedido.
             </p>
           </div>
           <span className="rounded-md border border-[#DCE4EC] bg-white px-3 py-1.5 text-xs font-medium text-[#526980]">
@@ -580,9 +547,7 @@ export const LandingPage: React.FC = () => {
               )}
               <div className="flex flex-1 flex-col justify-between p-6">
                 <div>
-                  <h3 className="text-lg font-bold text-[#17324D]">
-                    {plan.name}
-                  </h3>
+                  <h3 className="text-lg font-bold text-[#17324D]">{plan.name}</h3>
                   <p className="mt-1 text-xs text-[#526980]">{plan.audience}</p>
                   <div className="mt-4 flex items-baseline gap-1">
                     <span className="font-mono text-2xl font-bold tabular-nums text-[#17324D]">
@@ -635,12 +600,12 @@ export const LandingPage: React.FC = () => {
             className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#CBE4D3] bg-[#ECF7EE] px-4 py-3 text-xs text-[#17324D]"
           >
             <span>{selectedPlanNotice}</span>
-            <Link
-              to="/app"
+            <a
+              href={demoHref('/app')}
               className="font-semibold text-[#176B5B] hover:underline whitespace-nowrap"
             >
               Ir para o painel →
-            </Link>
+            </a>
           </div>
         )}
       </section>
@@ -648,9 +613,7 @@ export const LandingPage: React.FC = () => {
       {/* FAQ */}
       <section id="duvidas" className="border-t border-[#DCE4EC] bg-white py-16">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold tracking-tight text-[#17324D]">
-            Perguntas frequentes
-          </h2>
+          <h2 className="text-2xl font-bold tracking-tight text-[#17324D]">Perguntas frequentes</h2>
           <div className="mt-6 divide-y divide-[#DCE4EC] border-y border-[#DCE4EC]">
             {FAQS.map((item, idx) => {
               const isOpen = openFaqIndex === idx;
@@ -671,9 +634,7 @@ export const LandingPage: React.FC = () => {
                     />
                   </button>
                   {isOpen && (
-                    <p className="pb-4 text-sm leading-relaxed text-[#476078]">
-                      {item.a}
-                    </p>
+                    <p className="pb-4 text-sm leading-relaxed text-[#476078]">{item.a}</p>
                   )}
                 </div>
               );
@@ -686,28 +647,20 @@ export const LandingPage: React.FC = () => {
       <footer className="border-t border-[#233E58] bg-[#0E2235] py-8 text-[#CBD7E4]">
         <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-4 px-4 text-xs sm:flex-row sm:items-center sm:px-6 lg:px-8">
           <div>
-            <span className="font-semibold text-white">
-              {APP_CONFIG.brandName}
-            </span>{' '}
-            · Protótipo de demonstração em navegador (dados locais simulados,
-            empresa fictícia {state.company.tradeName}).
+            <span className="font-semibold text-white">{APP_CONFIG.brandName}</span> · Protótipo de
+            demonstração em navegador (dados locais simulados, empresa fictícia{' '}
+            {state.company.tradeName}).
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            <Link to="/app" className="hover:text-white hover:underline">
+            <a href={demoHref('/app')} className="hover:text-white hover:underline">
               Painel
-            </Link>
-            <Link
-              to="/app/assets"
-              className="hover:text-white hover:underline"
-            >
+            </a>
+            <a href={demoHref('/app/assets')} className="hover:text-white hover:underline">
               Equipamentos
-            </Link>
-            <Link
-              to="/a/eq-001"
-              className="hover:text-white hover:underline"
-            >
+            </a>
+            <a href={demoHref('/a/eq-001')} className="hover:text-white hover:underline">
               Ficha móvel
-            </Link>
+            </a>
           </div>
         </div>
       </footer>

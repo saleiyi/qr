@@ -19,6 +19,8 @@ import { useAppState } from '../context/AppStateContext';
 import { formatDateBR } from '../utils/date';
 import type { UserRole } from '../types/domain';
 import { t } from '../i18n';
+import { useOptionalPilot } from '../context/PilotContext';
+import { PilotAccount, PilotSyncBar } from './PilotAccount';
 
 interface AppShellProps {
   title: string;
@@ -37,13 +39,9 @@ const NAV_ITEMS = [
   { to: '/app/settings', label: t.nav.settings, icon: Settings, end: false },
 ];
 
-export const AppShell: React.FC<AppShellProps> = ({
-  title,
-  subtitle,
-  primaryAction,
-  children,
-}) => {
+export const AppShell: React.FC<AppShellProps> = ({ title, subtitle, primaryAction, children }) => {
   const { effectiveState, stats, demoSettings, setDemoRole } = useAppState();
+  const pilot = useOptionalPilot();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
 
@@ -91,9 +89,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                 {badgeCount > 0 && (
                   <span
                     className={`rounded px-1.5 py-0.5 font-mono tabular-nums text-[11px] font-semibold ${
-                      isActive
-                        ? 'bg-white/20 text-white'
-                        : 'bg-[#1E3B57] text-[#FBBF24]'
+                      isActive ? 'bg-white/20 text-white' : 'bg-[#1E3B57] text-[#FBBF24]'
                     }`}
                   >
                     {badgeCount}
@@ -122,7 +118,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             <span>{APP_CONFIG.brandName}</span>
           </Link>
           <span className="rounded border border-[#2B4966] bg-[#1B3650] px-2 py-0.5 text-[11px] font-medium text-[#CBD7E4]">
-            {APP_CONFIG.demoLabel}
+            {pilot ? 'Empresa' : APP_CONFIG.demoLabel}
           </span>
         </div>
 
@@ -138,40 +134,46 @@ export const AppShell: React.FC<AppShellProps> = ({
         <div className="flex-1 overflow-y-auto">{renderNavLinks()}</div>
 
         <div className="border-t border-[#23415C] p-4">
-          <div className="rounded-lg border border-[#294968] bg-[#1A354E] p-3">
-            <label
-              htmlFor="sidebar-role-select"
-              className="block text-[11px] font-semibold text-[#CBD7E4]"
-            >
-              Visão simulada de perfil
-            </label>
-            <select
-              id="sidebar-role-select"
-              value={demoSettings.activeDemoRole}
-              onChange={(e) => setDemoRole(e.target.value as UserRole)}
-              className="mt-1.5 w-full rounded-md border border-[#345678] bg-[#102436] px-2.5 py-1.5 text-xs font-medium text-white"
-            >
-              <option value="admin">Administrador (Edição total)</option>
-              <option value="operator">Operador (Inspeção em campo)</option>
-              <option value="viewer">Visualizador (Somente leitura)</option>
-            </select>
-            <p className="mt-1.5 text-[11px] leading-snug text-[#9FB5CA]">
-              Alterna a experiência do protótipo no navegador.
-            </p>
-          </div>
-          <Link
-            to="/a/eq-001"
-            className="mt-3 flex w-full items-center justify-between rounded-lg border border-[#294968] bg-[#1A354E] px-3 py-2 text-xs font-medium text-white hover:bg-[#234463]"
-          >
-            <span>Abrir ficha móvel (EQ-001)</span>
-            <ExternalLink className="h-3.5 w-3.5 text-[#5EEAD4]" aria-hidden="true" />
-          </Link>
-          <Link
-            to="/"
-            className="mt-2 block px-1 text-xs font-medium text-[#9FB5CA] hover:text-white"
-          >
-            ← Voltar à página do produto
-          </Link>
+          {pilot ? (
+            <PilotAccount />
+          ) : (
+            <>
+              <div className="rounded-lg border border-[#294968] bg-[#1A354E] p-3">
+                <label
+                  htmlFor="sidebar-role-select"
+                  className="block text-[11px] font-semibold text-[#CBD7E4]"
+                >
+                  Visão simulada de perfil
+                </label>
+                <select
+                  id="sidebar-role-select"
+                  value={demoSettings.activeDemoRole}
+                  onChange={(e) => setDemoRole(e.target.value as UserRole)}
+                  className="mt-1.5 w-full rounded-md border border-[#345678] bg-[#102436] px-2.5 py-1.5 text-xs font-medium text-white"
+                >
+                  <option value="admin">Administrador (Edição total)</option>
+                  <option value="operator">Operador (Inspeção em campo)</option>
+                  <option value="viewer">Visualizador (Somente leitura)</option>
+                </select>
+                <p className="mt-1.5 text-[11px] leading-snug text-[#9FB5CA]">
+                  Alterna a experiência do protótipo no navegador.
+                </p>
+              </div>
+              <Link
+                to="/a/eq-001"
+                className="mt-3 flex w-full items-center justify-between rounded-lg border border-[#294968] bg-[#1A354E] px-3 py-2 text-xs font-medium text-white hover:bg-[#234463]"
+              >
+                <span>Abrir ficha móvel (EQ-001)</span>
+                <ExternalLink className="h-3.5 w-3.5 text-[#5EEAD4]" aria-hidden="true" />
+              </Link>
+              <Link
+                to="/"
+                className="mt-2 block px-1 text-xs font-medium text-[#9FB5CA] hover:text-white"
+              >
+                ← Voltar à página do produto
+              </Link>
+            </>
+          )}
         </div>
       </aside>
 
@@ -184,10 +186,7 @@ export const AppShell: React.FC<AppShellProps> = ({
           aria-label="Navegação móvel"
           onClose={() => setMobileMenuOpen(false)}
         >
-          <div
-            className="fixed inset-0 bg-[#0B1B2B]/60"
-            onClick={() => setMobileMenuOpen(false)}
-          />
+          <div className="fixed inset-0 bg-[#0B1B2B]/60" onClick={() => setMobileMenuOpen(false)} />
           <div className="relative z-10 flex w-72 max-w-[85vw] flex-col bg-[#13293D] text-white shadow-2xl">
             <div className="flex h-16 items-center justify-between border-b border-[#23415C] px-4">
               <div className="flex items-center gap-2 font-bold text-white">
@@ -196,7 +195,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                 </span>
                 <span>{APP_CONFIG.brandName}</span>
                 <span className="rounded border border-[#2B4966] bg-[#1B3650] px-1.5 py-0.5 text-[10px] font-medium text-[#CBD7E4]">
-                  {APP_CONFIG.demoLabel}
+                  {pilot ? 'Empresa' : APP_CONFIG.demoLabel}
                 </span>
               </div>
               <button
@@ -209,9 +208,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               </button>
             </div>
             <div className="border-b border-[#23415C] px-4 py-3">
-              <p className="text-xs font-semibold text-white">
-                {effectiveState.company.tradeName}
-              </p>
+              <p className="text-xs font-semibold text-white">{effectiveState.company.tradeName}</p>
               <p className="text-xs text-[#9FB5CA] tabular-nums">
                 Ref.: {formatDateBR(APP_CONFIG.demoClockDate)}
               </p>
@@ -220,22 +217,28 @@ export const AppShell: React.FC<AppShellProps> = ({
               {renderNavLinks(() => setMobileMenuOpen(false))}
             </div>
             <div className="border-t border-[#23415C] p-4">
-              <label
-                htmlFor="mobile-role-select"
-                className="block text-xs font-semibold text-[#CBD7E4]"
-              >
-                Perfil simulado
-              </label>
-              <select
-                id="mobile-role-select"
-                value={demoSettings.activeDemoRole}
-                onChange={(e) => setDemoRole(e.target.value as UserRole)}
-                className="mt-1.5 w-full min-h-[44px] rounded-md border border-[#345678] bg-[#102436] px-3 text-sm text-white"
-              >
-                <option value="admin">Administrador</option>
-                <option value="operator">Operador</option>
-                <option value="viewer">Visualizador</option>
-              </select>
+              {pilot ? (
+                <PilotAccount />
+              ) : (
+                <>
+                  <label
+                    htmlFor="mobile-role-select"
+                    className="block text-xs font-semibold text-[#CBD7E4]"
+                  >
+                    Perfil simulado
+                  </label>
+                  <select
+                    id="mobile-role-select"
+                    value={demoSettings.activeDemoRole}
+                    onChange={(e) => setDemoRole(e.target.value as UserRole)}
+                    className="mt-1.5 w-full min-h-[44px] rounded-md border border-[#345678] bg-[#102436] px-3 text-sm text-white"
+                  >
+                    <option value="admin">Administrador</option>
+                    <option value="operator">Operador</option>
+                    <option value="viewer">Visualizador</option>
+                  </select>
+                </>
+              )}
             </div>
           </div>
         </Modal>
@@ -258,11 +261,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               <h1 className="text-base font-bold leading-tight tracking-tight text-[#17324D] sm:text-xl sm:leading-normal">
                 {title}
               </h1>
-              {subtitle && (
-                <p className="truncate text-xs text-[#526980] sm:text-sm">
-                  {subtitle}
-                </p>
-              )}
+              {subtitle && <p className="truncate text-xs text-[#526980] sm:text-sm">{subtitle}</p>}
             </div>
           </div>
 
@@ -275,6 +274,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             {primaryAction}
           </div>
         </header>
+        <PilotSyncBar />
 
         <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
           {demoSettings.simulateLoading ? (

@@ -1,0 +1,15 @@
+CREATE TABLE "user" (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL COLLATE NOCASE UNIQUE, emailVerified INTEGER NOT NULL DEFAULT 0, image TEXT, createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL);
+CREATE TABLE account (id TEXT PRIMARY KEY, accountId TEXT NOT NULL, providerId TEXT NOT NULL, userId TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE, accessToken TEXT, refreshToken TEXT, idToken TEXT, accessTokenExpiresAt TEXT, refreshTokenExpiresAt TEXT, scope TEXT, password TEXT, createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL, UNIQUE(providerId,accountId));
+CREATE INDEX account_user ON account(userId);
+CREATE TABLE session (id TEXT PRIMARY KEY, token TEXT NOT NULL UNIQUE, expiresAt TEXT NOT NULL, ipAddress TEXT, userAgent TEXT, userId TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE, createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL);
+CREATE INDEX session_user ON session(userId);
+CREATE TABLE verification (id TEXT PRIMARY KEY, identifier TEXT NOT NULL, value TEXT NOT NULL, expiresAt TEXT NOT NULL, createdAt TEXT, updatedAt TEXT);
+CREATE INDEX verification_identifier ON verification(identifier);
+CREATE TABLE pilot_workspace (id TEXT PRIMARY KEY, company TEXT NOT NULL CHECK(json_valid(company)), timezone TEXT NOT NULL, revision TEXT NOT NULL);
+CREATE TABLE pilot_member (id TEXT PRIMARY KEY, workspace TEXT NOT NULL REFERENCES pilot_workspace(id), email TEXT COLLATE NOCASE NOT NULL, name TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','operator','viewer')), status TEXT NOT NULL CHECK(status IN ('active','inactive')), jobTitle TEXT NOT NULL DEFAULT '', userId TEXT UNIQUE REFERENCES "user"(id), UNIQUE(workspace,email), UNIQUE(workspace,id), CHECK(userId IS NOT NULL OR status='inactive'));
+CREATE TABLE pilot_invite (digest TEXT PRIMARY KEY, workspace TEXT NOT NULL, member TEXT NOT NULL, expires TEXT NOT NULL, used INTEGER NOT NULL DEFAULT 0, FOREIGN KEY(workspace,member) REFERENCES pilot_member(workspace,id));
+CREATE UNIQUE INDEX one_pending_invite ON pilot_invite(workspace,member) WHERE used=0;
+CREATE TABLE pilot_entity (workspace TEXT NOT NULL REFERENCES pilot_workspace(id), kind TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL CHECK(json_valid(data)), PRIMARY KEY(workspace,kind,id));
+CREATE TABLE pilot_command (workspace TEXT NOT NULL REFERENCES pilot_workspace(id), id TEXT NOT NULL, digest TEXT NOT NULL, actor TEXT NOT NULL, type TEXT NOT NULL, at TEXT NOT NULL, result TEXT NOT NULL, inspectionKey TEXT, PRIMARY KEY(workspace,id), UNIQUE(workspace,inspectionKey));
+CREATE TABLE pilot_guard (valid INTEGER NOT NULL CONSTRAINT pilot_cas CHECK(valid=1));
+CREATE TABLE pilot_limit (key TEXT PRIMARY KEY, period INTEGER NOT NULL, count INTEGER NOT NULL);

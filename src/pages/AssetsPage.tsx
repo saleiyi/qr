@@ -1,13 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import {
-  Download,
-  FileUp,
-  Plus,
-  QrCode,
-  Search,
-  X,
-} from 'lucide-react';
+import { Download, FileUp, Plus, QrCode, Search, X } from 'lucide-react';
 import { APP_CONFIG } from '../config/appConfig';
 import { useAppState } from '../context/AppStateContext';
 import { AppShell } from '../components/AppShell';
@@ -15,10 +8,7 @@ import { AssetFormDrawer } from '../components/AssetFormDrawer';
 import { CsvImportModal } from '../components/CsvImportModal';
 import { QrLabelPrintModal } from '../components/QrLabelPrintModal';
 import { AssetIllustration } from '../components/AssetIllustration';
-import {
-  InspectionStatusBadge,
-  OperationalStatusBadge,
-} from '../components/StatusBadge';
+import { InspectionStatusBadge, OperationalStatusBadge } from '../components/StatusBadge';
 import {
   computeAssetInspectionStatus,
   filterAssets,
@@ -31,6 +21,7 @@ import { t } from '../i18n';
 const PAGE_SIZE = 10;
 
 export const AssetsPage: React.FC = () => {
+  const { isPilot } = useAppState();
   const { effectiveState, demoSettings, addToast } = useAppState();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -46,16 +37,19 @@ export const AssetsPage: React.FC = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [qrModalOpen, setQrModalOpen] = useState(false);
+  const isViewer =
+    demoSettings.activeDemoRole === 'viewer' ||
+    (isPilot && demoSettings.activeDemoRole !== 'admin');
 
   // Support /app/assets?new=1 shortcut from dashboard
   useEffect(() => {
     if (searchParams.get('new') === '1') {
-      setDrawerOpen(true);
+      if (!isViewer) setDrawerOpen(true);
       const next = new URLSearchParams(searchParams);
       next.delete('new');
       setSearchParams(next, { replace: true });
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, isViewer]);
 
   const updateFilter = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams);
@@ -86,28 +80,16 @@ export const AssetsPage: React.FC = () => {
         { search, siteId, category, inspectionStatus, operationalStatus },
         APP_CONFIG.demoClockDate,
       ),
-    [
-      effectiveState.assets,
-      search,
-      siteId,
-      category,
-      inspectionStatus,
-      operationalStatus,
-    ],
+    [effectiveState.assets, search, siteId, category, inspectionStatus, operationalStatus],
   );
 
   const totalPages = Math.max(1, Math.ceil(filteredAssets.length / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
-  const pageAssets = filteredAssets.slice(
-    (safePage - 1) * PAGE_SIZE,
-    safePage * PAGE_SIZE,
-  );
+  const pageAssets = filteredAssets.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const siteNameOf = (id: string) =>
-    effectiveState.sites.find((s) => s.id === id)?.name ?? id;
+  const siteNameOf = (id: string) => effectiveState.sites.find((s) => s.id === id)?.name ?? id;
 
-  const memberNameOf = (id: string) =>
-    effectiveState.members.find((m) => m.id === id)?.name ?? '—';
+  const memberNameOf = (id: string) => effectiveState.members.find((m) => m.id === id)?.name ?? '—';
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) =>
@@ -134,18 +116,14 @@ export const AssetsPage: React.FC = () => {
   );
 
   const handleExportCsv = () => {
-    const scopeAssets =
-      selectedAssets.length > 0 ? selectedAssets : filteredAssets;
+    const scopeAssets = selectedAssets.length > 0 ? selectedAssets : filteredAssets;
     if (scopeAssets.length === 0) return;
 
     const csv = buildAssetsCsv(
       scopeAssets,
       effectiveState.sites,
       effectiveState.members,
-      (asset) =>
-        t.inspectionStatus[
-          computeAssetInspectionStatus(asset, APP_CONFIG.demoClockDate)
-        ],
+      (asset) => t.inspectionStatus[computeAssetInspectionStatus(asset, APP_CONFIG.demoClockDate)],
     );
     const filename =
       selectedAssets.length > 0
@@ -163,7 +141,6 @@ export const AssetsPage: React.FC = () => {
     });
   };
 
-  const isViewer = demoSettings.activeDemoRole === 'viewer';
   const currentQueryString = searchParams.toString();
 
   return (
@@ -442,10 +419,7 @@ export const AssetsPage: React.FC = () => {
                       : `/app/assets/${asset.id}`;
 
                     return (
-                      <tr
-                        key={asset.id}
-                        className="hover:bg-[#F4F7FA]/70 transition-colors"
-                      >
+                      <tr key={asset.id} className="hover:bg-[#F4F7FA]/70 transition-colors">
                         <td className="px-4 py-3">
                           <input
                             type="checkbox"
@@ -482,9 +456,7 @@ export const AssetsPage: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-xs text-[#35506B]">
-                          <p className="font-medium text-[#17324D]">
-                            {siteNameOf(asset.siteId)}
-                          </p>
+                          <p className="font-medium text-[#17324D]">{siteNameOf(asset.siteId)}</p>
                           <p className="text-[#526980]">{asset.sector}</p>
                         </td>
                         <td className="px-4 py-3 text-xs text-[#35506B]">
@@ -494,9 +466,7 @@ export const AssetsPage: React.FC = () => {
                           <div className="flex flex-col items-start gap-1">
                             <InspectionStatusBadge status={inspStatus} />
                             {asset.operationalStatus !== 'active' && (
-                              <OperationalStatusBadge
-                                status={asset.operationalStatus}
-                              />
+                              <OperationalStatusBadge status={asset.operationalStatus} />
                             )}
                           </div>
                         </td>
@@ -531,23 +501,14 @@ export const AssetsPage: React.FC = () => {
           {/* Mobile Card List */}
           <div className="mt-4 space-y-3 md:hidden">
             {pageAssets.map((asset) => {
-              const inspStatus = computeAssetInspectionStatus(
-                asset,
-                APP_CONFIG.demoClockDate,
-              );
-              const openIssuesCount = getAssetOpenIssues(
-                asset.id,
-                effectiveState.issues,
-              ).length;
+              const inspStatus = computeAssetInspectionStatus(asset, APP_CONFIG.demoClockDate);
+              const openIssuesCount = getAssetOpenIssues(asset.id, effectiveState.issues).length;
               const detailHref = currentQueryString
                 ? `/app/assets/${asset.id}?from=${encodeURIComponent(currentQueryString)}`
                 : `/app/assets/${asset.id}`;
 
               return (
-                <div
-                  key={asset.id}
-                  className="rounded-xl border border-[#DCE4EC] bg-white p-4"
-                >
+                <div key={asset.id} className="rounded-xl border border-[#DCE4EC] bg-white p-4">
                   <div className="flex items-start gap-3">
                     <input
                       type="checkbox"

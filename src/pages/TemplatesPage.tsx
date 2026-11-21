@@ -3,6 +3,7 @@ import { useBeforeUnload, useBlocker, useSearchParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, Copy, Eye, FileCheck2, Plus, Save, Trash2, Send } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { useAppState } from '../context/AppStateContext';
+import { useOptionalPilot } from '../context/PilotContext';
 import { ChecklistPreview } from '../components/ChecklistPreview';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import {
@@ -50,6 +51,8 @@ const makeItem = (): TemplateItem => ({
 });
 
 export function TemplatesPage() {
+  const pilot = useOptionalPilot();
+  const editor = useRef<HTMLElement>(null);
   const { state, demoSettings, saveTemplateDraft, publishTemplate, applyTemplateToCategory } =
     useAppState();
   const [params, setParams] = useSearchParams();
@@ -59,7 +62,7 @@ export function TemplatesPage() {
   ];
   const selected = all.find((t) => t.id === params.get('templateId')) ?? all[0];
   const published = state.templates.find((t) => t.id === selected?.id);
-  const [draft, setDraft] = useState<ChecklistTemplate | null>(() =>
+  const [draft, setDraftState] = useState<ChecklistTemplate | null>(() =>
     selected ? structuredClone(selected) : null,
   );
   const [baseline, setBaseline] = useState(() => JSON.stringify(selected));
@@ -72,6 +75,10 @@ export function TemplatesPage() {
   const allowLeave = useRef(false);
   const canEdit = demoSettings.activeDemoRole === 'admin';
   const dirty = canEdit && Boolean(draft) && JSON.stringify(draft) !== baseline;
+  const setDraft = (next: ChecklistTemplate | null) => {
+    if (editor.current) pilot?.beginEditing(editor.current);
+    setDraftState(next);
+  };
   const blocker = useBlocker(useCallback(() => dirty && !allowLeave.current, [dirty]));
   useBeforeUnload(
     useCallback(
@@ -85,12 +92,16 @@ export function TemplatesPage() {
     ),
   );
   useEffect(() => {
-    setDraft(selected ? structuredClone(selected) : null);
+    if (dirty && draft?.id === selected?.id) return;
+    setDraftState(selected ? structuredClone(selected) : null);
     setBaseline(JSON.stringify(selected));
     setError(null);
     allowLeave.current = false;
-  }, [selected]);
-  const select = (id: string) => setParams({ templateId: id }, { replace: true });
+  }, [selected, dirty]);
+  const select = (id: string) => {
+    pilot?.completeEditing();
+    setParams({ templateId: id }, { replace: true });
+  };
   const requestAction = (action: () => void) => {
     if (dirty) {
       pendingAction.current = action;
@@ -204,7 +215,12 @@ export function TemplatesPage() {
         <div className="min-w-0 space-y-5">
           {draft ? (
             <>
-              <section className="rounded-xl border border-[#DCE4EC] bg-white p-4 sm:p-5">
+              <section
+                ref={editor}
+                data-cloud-editor
+                data-cloud-command="template.draft template.publish"
+                className="rounded-xl border border-[#DCE4EC] bg-white p-4 sm:p-5"
+              >
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#DCE4EC] pb-4">
                   <div>
                     <p className="text-sm font-semibold">

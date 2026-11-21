@@ -2,11 +2,7 @@ import { Modal } from './Modal';
 import React, { useEffect, useRef, useState } from 'react';
 import { Trash2, Upload, X } from 'lucide-react';
 import { useAppState } from '../context/AppStateContext';
-import type {
-  Asset,
-  EquipmentCategory,
-  OperationalStatus,
-} from '../types/domain';
+import type { Asset, EquipmentCategory, OperationalStatus } from '../types/domain';
 import { validateAssetInput } from '../utils/domainLogic';
 import { processImageUpload } from '../services/storageAdapter';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -33,8 +29,7 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
   onClose,
   onSaved,
 }) => {
-  const { state, createAsset, updateAsset, deactivateAsset, reactivateAsset } =
-    useAppState();
+  const { state, createAsset, updateAsset, deactivateAsset, reactivateAsset } = useAppState();
   const isEditing = Boolean(editingAsset);
 
   const [name, setName] = useState('');
@@ -45,8 +40,7 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
   const [assigneeId, setAssigneeId] = useState('');
   const [cycleDays, setCycleDays] = useState('30');
   const [templateId, setTemplateId] = useState('');
-  const [operationalStatus, setOperationalStatus] =
-    useState<OperationalStatus>('active');
+  const [operationalStatus, setOperationalStatus] = useState<OperationalStatus>('active');
   const [manufacturer, setManufacturer] = useState('');
   const [model, setModel] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
@@ -200,23 +194,14 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
         onClose={requestClose}
         initialFocusRef={firstInputRef}
       >
-        <div
-          className="fixed inset-0"
-          onClick={requestClose}
-          aria-hidden="true"
-        />
+        <div className="fixed inset-0" onClick={requestClose} aria-hidden="true" />
         <div className="relative z-10 flex h-full w-full max-w-xl flex-col bg-white shadow-2xl">
           <div className="flex items-center justify-between border-b border-[#DCE4EC] px-6 py-4">
             <div>
-              <h2
-                id="asset-drawer-title"
-                className="text-lg font-semibold text-[#17324D]"
-              >
+              <h2 id="asset-drawer-title" className="text-lg font-semibold text-[#17324D]">
                 {isEditing ? `Editar equipamento ${editingAsset?.code}` : 'Novo equipamento'}
               </h2>
-              <p className="text-xs text-[#526980]">
-                Campos obrigatórios marcados com *
-              </p>
+              <p className="text-xs text-[#526980]">Campos obrigatórios marcados com *</p>
             </div>
             <button
               type="button"
@@ -230,16 +215,14 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
 
           <form
             onSubmit={handleSubmit}
+            data-cloud-command={isEditing ? 'asset.update' : 'asset.create'}
             className="flex flex-1 flex-col overflow-y-auto px-6 py-5"
             noValidate
           >
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="sm:col-span-2">
-                  <label
-                    htmlFor="asset-name"
-                    className="block text-sm font-medium text-[#17324D]"
-                  >
+                  <label htmlFor="asset-name" className="block text-sm font-medium text-[#17324D]">
                     Nome do equipamento *
                   </label>
                   <input
@@ -264,10 +247,7 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
                 </div>
 
                 <div>
-                  <label
-                    htmlFor="asset-code"
-                    className="block text-sm font-medium text-[#17324D]"
-                  >
+                  <label htmlFor="asset-code" className="block text-sm font-medium text-[#17324D]">
                     Código *
                   </label>
                   <input
@@ -317,10 +297,7 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
                 </div>
 
                 <div>
-                  <label
-                    htmlFor="asset-site"
-                    className="block text-sm font-medium text-[#17324D]"
-                  >
+                  <label htmlFor="asset-site" className="block text-sm font-medium text-[#17324D]">
                     Local / Unidade *
                   </label>
                   <select
@@ -389,10 +366,7 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
-                  <label
-                    htmlFor="asset-cycle"
-                    className="block text-sm font-medium text-[#17324D]"
-                  >
+                  <label htmlFor="asset-cycle" className="block text-sm font-medium text-[#17324D]">
                     Ciclo de inspeção (dias) *
                   </label>
                   <input
@@ -485,10 +459,7 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
                   />
                 </div>
                 <div>
-                  <label
-                    htmlFor="asset-model"
-                    className="block text-sm font-medium text-[#17324D]"
-                  >
+                  <label htmlFor="asset-model" className="block text-sm font-medium text-[#17324D]">
                     Modelo
                   </label>
                   <input
@@ -525,10 +496,7 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
               </div>
 
               <div>
-                <label
-                  htmlFor="asset-notes"
-                  className="block text-sm font-medium text-[#17324D]"
-                >
+                <label htmlFor="asset-notes" className="block text-sm font-medium text-[#17324D]">
                   Observações técnicas
                 </label>
                 <textarea
@@ -547,9 +515,7 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
               <div className="rounded-lg border border-[#DCE4EC] bg-[#F4F7FA] p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium text-[#17324D]">
-                      Foto do equipamento
-                    </p>
+                    <p className="text-sm font-medium text-[#17324D]">Foto do equipamento</p>
                     <p className="text-xs text-[#526980]">
                       JPG, PNG ou WEBP até 5 MB (reduzida localmente para salvar no navegador).
                     </p>
@@ -611,8 +577,8 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
                     <button
                       type="button"
                       onClick={async () => {
-                        const result=await reactivateAsset(editingAsset.id);
-                        if(result.ok)onClose();
+                        const result = await reactivateAsset(editingAsset.id);
+                        if (result.ok) onClose();
                       }}
                       className="rounded-lg border border-[#176B5B] px-3 py-1.5 text-xs font-semibold text-[#176B5B] hover:bg-[#EAF4F1] whitespace-nowrap"
                     >
@@ -673,8 +639,8 @@ export const AssetFormDrawer: React.FC<AssetFormDrawerProps> = ({
         tone="danger"
         onConfirm={async () => {
           if (editingAsset) {
-            const result=await deactivateAsset(editingAsset.id);
-            if(!result.ok)return;
+            const result = await deactivateAsset(editingAsset.id);
+            if (!result.ok) return;
           }
           setConfirmDeactivateOpen(false);
           onClose();

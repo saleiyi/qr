@@ -15,6 +15,7 @@ import {
   Smartphone,
 } from 'lucide-react';
 import { APP_CONFIG } from '../config/appConfig';
+import { equipmentScanUrl } from '../services/runtimeMode';
 import { useAppState } from '../context/AppStateContext';
 import { AppShell } from '../components/AppShell';
 import { AssetIllustration } from '../components/AssetIllustration';
@@ -28,15 +29,12 @@ import {
   OperationalStatusBadge,
 } from '../components/StatusBadge';
 import { computeAssetInspectionStatus } from '../utils/domainLogic';
-import {
-  formatDateBR,
-  formatDateTimeBR,
-  formatRelativeDueBR,
-} from '../utils/date';
+import { formatDateBR, formatDateTimeBR, formatRelativeDueBR } from '../utils/date';
 
 type DetailTab = 'overview' | 'history' | 'issues' | 'files';
 
 export const AssetDetailPage: React.FC = () => {
+  const { isPilot } = useAppState();
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const { state, demoSettings, addToast } = useAppState();
@@ -58,7 +56,9 @@ export const AssetDetailPage: React.FC = () => {
             Este equipamento não foi localizado
           </h2>
           <p className="mt-1 text-sm text-[#476078]">
-            O código pode ter sido removido ou os dados da demonstração foram restaurados.
+            {isPilot
+              ? 'O equipamento não está disponível na sua empresa. Confira o endereço com o administrador.'
+              : 'O código pode ter sido removido ou os dados da demonstração foram restaurados.'}
           </p>
           <Link
             to="/app/assets"
@@ -82,8 +82,9 @@ export const AssetDetailPage: React.FC = () => {
   const openIssues = assetIssues.filter((i) => i.status !== 'resolved');
 
   const scanPath = `/a/${asset.id}`;
-  const scanUrl = `${window.location.origin}${scanPath}`;
+  const scanUrl = equipmentScanUrl(asset.id);
   const isViewer = demoSettings.activeDemoRole === 'viewer';
+  const canManageAssets = isPilot ? demoSettings.activeDemoRole === 'admin' : !isViewer;
 
   const handleCopyScanUrl = async () => {
     try {
@@ -117,7 +118,7 @@ export const AssetDetailPage: React.FC = () => {
       subtitle={`${site?.name ?? ''} · Setor ${asset.sector}`}
       primaryAction={
         <div className="flex items-center gap-2">
-          {!isViewer && (
+          {canManageAssets && (
             <button
               type="button"
               onClick={() => setEditDrawerOpen(true)}
@@ -151,9 +152,7 @@ export const AssetDetailPage: React.FC = () => {
       <section className="overflow-hidden rounded-xl border border-[#DCE4EC] bg-white shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#23415C] bg-[#13293D] px-5 py-2.5 text-xs text-[#CBD7E4]">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono font-bold text-[#5EEAD4]">
-              {asset.code}
-            </span>
+            <span className="font-mono font-bold text-[#5EEAD4]">{asset.code}</span>
             <span aria-hidden="true">·</span>
             <span>{asset.category}</span>
             <span aria-hidden="true">·</span>
@@ -161,9 +160,7 @@ export const AssetDetailPage: React.FC = () => {
               {asset.manufacturer} {asset.model}
             </span>
           </div>
-          <span className="font-mono text-[11px] text-[#9FB5CA]">
-            Série: {asset.serialNumber}
-          </span>
+          <span className="font-mono text-[11px] text-[#9FB5CA]">Série: {asset.serialNumber}</span>
         </div>
 
         <div className="flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-start lg:justify-between">
@@ -177,14 +174,10 @@ export const AssetDetailPage: React.FC = () => {
               size="lg"
             />
             <div className="min-w-0">
-              <h2 className="text-xl font-bold text-[#17324D]">
-                {asset.name}
-              </h2>
+              <h2 className="text-xl font-bold text-[#17324D]">{asset.name}</h2>
               <p className="mt-1 text-sm text-[#476078]">
                 {site?.name} · {asset.sector} · Responsável:{' '}
-                <strong className="font-semibold text-[#17324D]">
-                  {assignee?.name ?? '—'}
-                </strong>
+                <strong className="font-semibold text-[#17324D]">{assignee?.name ?? '—'}</strong>
               </p>
 
               <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -202,17 +195,13 @@ export const AssetDetailPage: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-4 rounded-lg border border-[#DCE4EC] bg-[#F4F7FA] p-4 sm:grid-cols-3 lg:min-w-[330px]">
             <div>
-              <span className="text-[11px] font-medium text-[#526980]">
-                Última inspeção
-              </span>
+              <span className="text-[11px] font-medium text-[#526980]">Última inspeção</span>
               <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[#17324D]">
                 {formatDateBR(asset.lastInspectionAt)}
               </p>
             </div>
             <div>
-              <span className="text-[11px] font-medium text-[#526980]">
-                Próxima janela
-              </span>
+              <span className="text-[11px] font-medium text-[#526980]">Próxima janela</span>
               <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[#17324D]">
                 {asset.operationalStatus === 'inactive'
                   ? 'Suspensa'
@@ -220,23 +209,16 @@ export const AssetDetailPage: React.FC = () => {
               </p>
               {asset.operationalStatus !== 'inactive' && (
                 <p className="text-[11px] text-[#476078]">
-                  {formatRelativeDueBR(
-                    asset.nextInspectionDue,
-                    APP_CONFIG.demoClockDate,
-                  )}
+                  {formatRelativeDueBR(asset.nextInspectionDue, APP_CONFIG.demoClockDate)}
                 </p>
               )}
             </div>
             <div className="col-span-2 sm:col-span-1">
-              <span className="text-[11px] font-medium text-[#526980]">
-                Ciclo / Modelo
-              </span>
+              <span className="text-[11px] font-medium text-[#526980]">Ciclo / Modelo</span>
               <p className="mt-0.5 text-sm font-semibold tabular-nums text-[#17324D]">
                 A cada {asset.inspectionCycleDays} dias
               </p>
-              <p className="truncate text-[11px] text-[#476078]">
-                {template?.name ?? 'Padrão'}
-              </p>
+              <p className="truncate text-[11px] text-[#476078]">{template?.name ?? 'Padrão'}</p>
             </div>
           </div>
         </div>
@@ -289,15 +271,11 @@ export const AssetDetailPage: React.FC = () => {
                   <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 text-sm">
                     <div className="rounded-lg border border-[#DCE4EC] p-3.5">
                       <dt className="text-xs text-[#526980]">Fabricante</dt>
-                      <dd className="mt-0.5 font-medium text-[#17324D]">
-                        {asset.manufacturer}
-                      </dd>
+                      <dd className="mt-0.5 font-medium text-[#17324D]">{asset.manufacturer}</dd>
                     </div>
                     <div className="rounded-lg border border-[#DCE4EC] p-3.5">
                       <dt className="text-xs text-[#526980]">Modelo</dt>
-                      <dd className="mt-0.5 font-medium text-[#17324D]">
-                        {asset.model}
-                      </dd>
+                      <dd className="mt-0.5 font-medium text-[#17324D]">{asset.model}</dd>
                     </div>
                     <div className="rounded-lg border border-[#DCE4EC] p-3.5">
                       <dt className="text-xs text-[#526980]">Número de série</dt>
@@ -306,9 +284,7 @@ export const AssetDetailPage: React.FC = () => {
                       </dd>
                     </div>
                     <div className="rounded-lg border border-[#DCE4EC] p-3.5">
-                      <dt className="text-xs text-[#526980]">
-                        Modelo de inspeção vinculado
-                      </dt>
+                      <dt className="text-xs text-[#526980]">Modelo de inspeção vinculado</dt>
                       <dd className="mt-0.5 font-medium text-[#17324D]">
                         {template?.name ?? 'Não definido'}
                       </dd>
@@ -330,10 +306,7 @@ export const AssetDetailPage: React.FC = () => {
                 <div>
                   {assetRecords.length === 0 ? (
                     <div className="py-8 text-center">
-                      <Calendar
-                        className="mx-auto h-7 w-7 text-[#6B8094]"
-                        aria-hidden="true"
-                      />
+                      <Calendar className="mx-auto h-7 w-7 text-[#6B8094]" aria-hidden="true" />
                       <p className="mt-2 text-sm font-semibold text-[#17324D]">
                         Nenhuma inspeção registrada ainda
                       </p>
@@ -352,10 +325,7 @@ export const AssetDetailPage: React.FC = () => {
                       {assetRecords.map((rec) => {
                         const isExpanded = expandedRecordId === rec.id;
                         return (
-                          <li
-                            key={rec.id}
-                            className="rounded-lg border border-[#DCE4EC] p-4"
-                          >
+                          <li key={rec.id} className="rounded-lg border border-[#DCE4EC] p-4">
                             <div className="flex flex-wrap items-start justify-between gap-2">
                               <div>
                                 <div className="flex flex-wrap items-center gap-2">
@@ -383,9 +353,7 @@ export const AssetDetailPage: React.FC = () => {
                               <button
                                 type="button"
                                 aria-expanded={isExpanded}
-                                onClick={() =>
-                                  setExpandedRecordId(isExpanded ? null : rec.id)
-                                }
+                                onClick={() => setExpandedRecordId(isExpanded ? null : rec.id)}
                                 className="rounded-md border border-[#DCE4EC] px-2.5 py-1 text-xs font-medium text-[#17324D] hover:bg-[#F4F7FA]"
                               >
                                 {isExpanded ? 'Ocultar itens' : 'Ver respostas'}
@@ -393,9 +361,7 @@ export const AssetDetailPage: React.FC = () => {
                             </div>
 
                             {rec.generalNotes && (
-                              <p className="mt-2 text-xs text-[#35506B]">
-                                {rec.generalNotes}
-                              </p>
+                              <p className="mt-2 text-xs text-[#35506B]">{rec.generalNotes}</p>
                             )}
 
                             {isExpanded && (
@@ -406,19 +372,22 @@ export const AssetDetailPage: React.FC = () => {
                                     className="flex flex-col justify-between gap-1 py-2.5 text-xs sm:flex-row sm:items-center"
                                   >
                                     <div>
-                                      <p className="font-medium text-[#17324D]">
-                                        {ans.label}
-                                      </p>
+                                      <p className="font-medium text-[#17324D]">{ans.label}</p>
                                       {ans.numericValue && (
                                         <p className="font-mono text-[#476078]">
                                           Leitura: {ans.numericValue} {ans.unit}
                                         </p>
                                       )}
-                                      {ans.value && <p className="mt-1 text-[#476078]">Resposta: {ans.type === 'date'?formatDateBR(ans.value):ans.value}</p>}
-                                      {ans.note && (
-                                        <p className="mt-0.5 text-[#B42318]">
-                                          Obs.: {ans.note}
+                                      {ans.value && (
+                                        <p className="mt-1 text-[#476078]">
+                                          Resposta:{' '}
+                                          {ans.type === 'date'
+                                            ? formatDateBR(ans.value)
+                                            : ans.value}
                                         </p>
+                                      )}
+                                      {ans.note && (
+                                        <p className="mt-0.5 text-[#B42318]">Obs.: {ans.note}</p>
                                       )}
                                     </div>
                                     <span
@@ -452,10 +421,7 @@ export const AssetDetailPage: React.FC = () => {
                 <div>
                   {assetIssues.length === 0 ? (
                     <div className="py-8 text-center">
-                      <CheckCircle2
-                        className="mx-auto h-7 w-7 text-[#137333]"
-                        aria-hidden="true"
-                      />
+                      <CheckCircle2 className="mx-auto h-7 w-7 text-[#137333]" aria-hidden="true" />
                       <p className="mt-2 text-sm font-semibold text-[#17324D]">
                         Nenhuma pendência registrada para este equipamento
                       </p>
@@ -463,10 +429,7 @@ export const AssetDetailPage: React.FC = () => {
                   ) : (
                     <ul className="space-y-3">
                       {assetIssues.map((iss) => (
-                        <li
-                          key={iss.id}
-                          className="rounded-lg border border-[#DCE4EC] p-4"
-                        >
+                        <li key={iss.id} className="rounded-lg border border-[#DCE4EC] p-4">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
                               <IssueStatusBadge status={iss.status} />
@@ -477,12 +440,8 @@ export const AssetDetailPage: React.FC = () => {
                               {formatDateBR(iss.dueDate)}
                             </span>
                           </div>
-                          <p className="mt-2 text-sm font-semibold text-[#17324D]">
-                            {iss.title}
-                          </p>
-                          <p className="mt-1 text-xs text-[#476078]">
-                            {iss.description}
-                          </p>
+                          <p className="mt-2 text-sm font-semibold text-[#17324D]">{iss.title}</p>
+                          <p className="mt-1 text-xs text-[#476078]">{iss.description}</p>
                           {iss.resolutionNote && (
                             <p className="mt-2 rounded bg-[#ECF7EE] px-3 py-2 text-xs text-[#137333]">
                               <strong>Tratamento ({formatDateBR(iss.resolvedAt)}):</strong>{' '}
@@ -534,9 +493,7 @@ export const AssetDetailPage: React.FC = () => {
                             aria-hidden="true"
                           />
                           <div className="min-w-0">
-                            <p className="truncate font-semibold text-[#17324D]">
-                              {f.name}
-                            </p>
+                            <p className="truncate font-semibold text-[#17324D]">{f.name}</p>
                             <p className="text-[#526980]">
                               {f.sizeLabel} · Enviado em {formatDateBR(f.uploadedAt)}
                             </p>
@@ -558,9 +515,7 @@ export const AssetDetailPage: React.FC = () => {
         <aside className="lg:col-span-4">
           <div className="overflow-hidden rounded-xl border border-[#DCE4EC] bg-white shadow-xs">
             <div className="border-b border-[#23415C] bg-[#13293D] px-5 py-3 text-white">
-              <h2 className="text-sm font-bold">
-                Etiqueta e QR Code
-              </h2>
+              <h2 className="text-sm font-bold">Etiqueta e QR Code</h2>
               <p className="mt-0.5 text-[11px] text-[#CBD7E4]">
                 Escaneando este código, o técnico abre diretamente a ficha móvel.
               </p>
@@ -568,11 +523,7 @@ export const AssetDetailPage: React.FC = () => {
 
             <div className="p-5">
               <div className="flex flex-col items-center rounded-xl border-2 border-[#17324D]/15 bg-[#F4F7FA] p-5">
-                <QrCodeDisplay
-                  value={scanUrl}
-                  size={168}
-                  label={`QR Code de ${asset.code}`}
-                />
+                <QrCodeDisplay value={scanUrl} size={168} label={`QR Code de ${asset.code}`} />
                 <p className="mt-3 rounded bg-[#13293D] px-2.5 py-0.5 font-mono text-sm font-bold text-[#5EEAD4]">
                   {asset.code}
                 </p>
@@ -582,42 +533,42 @@ export const AssetDetailPage: React.FC = () => {
               </div>
 
               <div className="mt-4 space-y-2">
-              <Link
-                to={scanPath}
-                className="flex w-full min-h-[40px] items-center justify-center gap-2 rounded-lg bg-[#17324D] px-4 py-2 text-xs font-semibold text-white hover:bg-[#10253A]"
-              >
-                <Smartphone className="h-4 w-4" aria-hidden="true" />
-                <span>Abrir página do QR Code</span>
-                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-              </Link>
+                <Link
+                  to={scanPath}
+                  className="flex w-full min-h-[40px] items-center justify-center gap-2 rounded-lg bg-[#17324D] px-4 py-2 text-xs font-semibold text-white hover:bg-[#10253A]"
+                >
+                  <Smartphone className="h-4 w-4" aria-hidden="true" />
+                  <span>Abrir página do QR Code</span>
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                </Link>
 
-              <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDownloadQrPng}
+                    className="inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg border border-[#DCE4EC] bg-white px-3 py-2 text-xs font-semibold text-[#17324D] hover:bg-[#F4F7FA]"
+                  >
+                    <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                    Baixar PNG
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCopyScanUrl}
+                    className="inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg border border-[#DCE4EC] bg-white px-3 py-2 text-xs font-semibold text-[#17324D] hover:bg-[#F4F7FA]"
+                  >
+                    <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                    Copiar link
+                  </button>
+                </div>
+
                 <button
                   type="button"
-                  onClick={handleDownloadQrPng}
-                  className="inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg border border-[#DCE4EC] bg-white px-3 py-2 text-xs font-semibold text-[#17324D] hover:bg-[#F4F7FA]"
+                  onClick={() => setPrintModalOpen(true)}
+                  className="flex w-full min-h-[40px] items-center justify-center gap-1.5 rounded-lg border border-[#DCE4EC] bg-white px-4 py-2 text-xs font-semibold text-[#17324D] hover:bg-[#F4F7FA]"
                 >
-                  <Download className="h-3.5 w-3.5" aria-hidden="true" />
-                  Baixar PNG
+                  <Printer className="h-3.5 w-3.5" aria-hidden="true" />
+                  Imprimir etiqueta A4
                 </button>
-                <button
-                  type="button"
-                  onClick={handleCopyScanUrl}
-                  className="inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg border border-[#DCE4EC] bg-white px-3 py-2 text-xs font-semibold text-[#17324D] hover:bg-[#F4F7FA]"
-                >
-                  <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-                  Copiar link
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setPrintModalOpen(true)}
-                className="flex w-full min-h-[40px] items-center justify-center gap-1.5 rounded-lg border border-[#DCE4EC] bg-white px-4 py-2 text-xs font-semibold text-[#17324D] hover:bg-[#F4F7FA]"
-              >
-                <Printer className="h-3.5 w-3.5" aria-hidden="true" />
-                Imprimir etiqueta A4
-              </button>
               </div>
             </div>
           </div>

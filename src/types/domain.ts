@@ -1,19 +1,10 @@
 export type EquipmentCategory =
-  | 'Climatização'
-  | 'Compressores'
-  | 'Movimentação'
-  | 'Energia'
-  | 'Ferramentas'
-  | 'Elétrica';
+  'Climatização' | 'Compressores' | 'Movimentação' | 'Energia' | 'Ferramentas' | 'Elétrica';
 
 export type OperationalStatus = 'active' | 'maintenance' | 'inactive';
 
 export type InspectionScheduleStatus =
-  | 'ok'
-  | 'due_soon'
-  | 'overdue'
-  | 'never_inspected'
-  | 'inactive';
+  'ok' | 'due_soon' | 'overdue' | 'never_inspected' | 'inactive';
 
 export type UserRole = 'admin' | 'operator' | 'viewer';
 
@@ -41,6 +32,7 @@ export interface Member {
   jobTitle: string;
   email: string;
   status: MemberStatus;
+  invitationPending?: boolean;
 }
 
 export interface AssetFile {

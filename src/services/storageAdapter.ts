@@ -4,6 +4,38 @@ import { normalizeOperationsState } from '../utils/operations';
 
 const STORAGE_KEY = 'ativos_demo_state_v1';
 const DRAFT_PREFIX = 'ativos_demo_draft_v1_';
+const PILOT_DRAFT_PREFIX = 'tagronda_pilot_draft_v1_';
+let pilotDraftScope = '';
+
+export function clearPilotDrafts(): void {
+  try {
+    const keys = Object.keys(window.localStorage).filter((key) =>
+      key.startsWith(PILOT_DRAFT_PREFIX),
+    );
+    for (const key of keys) window.localStorage.removeItem(key);
+    window.sessionStorage.removeItem('tagronda_draft_owner');
+  } catch {
+    /* Draft failures are reported by their save action. */
+  }
+}
+
+export function configurePilotDraftScope(
+  identity: { workspaceId: string; userId: string } | null,
+): void {
+  const next = identity ? `${identity.workspaceId}_${identity.userId}_` : '';
+  try {
+    const previous = window.sessionStorage.getItem('tagronda_draft_owner');
+    if (next && previous && previous !== next) clearPilotDrafts();
+    if (next) window.sessionStorage.setItem('tagronda_draft_owner', next);
+  } catch {
+    /* A cloud session remains usable without persistent browser drafts. */
+  }
+  pilotDraftScope = next;
+}
+
+function draftStoragePrefix(): string {
+  return pilotDraftScope ? `${PILOT_DRAFT_PREFIX}${pilotDraftScope}` : DRAFT_PREFIX;
+}
 
 export interface StorageResult<T> {
   ok: boolean;
@@ -111,7 +143,7 @@ export async function resetAppStateStorage(): Promise<StorageResult<AppStateData
 export function loadInspectionDraft(assetId: string, taskId?: string): InspectionDraft | null {
   try {
     const raw = window.localStorage.getItem(
-      `${DRAFT_PREFIX}${assetId}${taskId ? `:${taskId}` : ''}`,
+      `${draftStoragePrefix()}${assetId}${taskId ? `:${taskId}` : ''}`,
     );
     if (!raw) return null;
     return JSON.parse(raw) as InspectionDraft;
@@ -139,11 +171,11 @@ export function saveInspectionDraft(
         (existing.questionSnapshot &&
           JSON.stringify(existing.questionSnapshot) !== JSON.stringify(draft.questionSnapshot)))
     ) {
-      const archiveKey = `${DRAFT_PREFIX}archive:${draft.assetId}:${draft.taskId ?? 'adhoc'}:${existing.templateId}:${existing.updatedAt}`;
+      const archiveKey = `${draftStoragePrefix()}archive:${draft.assetId}:${draft.taskId ?? 'adhoc'}:${existing.templateId}:${existing.updatedAt}`;
       window.localStorage.setItem(archiveKey, JSON.stringify(existing));
     }
     window.localStorage.setItem(
-      `${DRAFT_PREFIX}${draft.assetId}${draft.taskId ? `:${draft.taskId}` : ''}`,
+      `${draftStoragePrefix()}${draft.assetId}${draft.taskId ? `:${draft.taskId}` : ''}`,
       JSON.stringify(draft),
     );
     return { ok: true };
@@ -160,7 +192,7 @@ export function loadArchivedDrafts(assetId: string, taskId?: string): Inspection
   try {
     for (let index = 0; index < localStorage.length; index++) {
       const key = localStorage.key(index);
-      if (!key?.startsWith(`${DRAFT_PREFIX}archive:`)) continue;
+      if (!key?.startsWith(`${draftStoragePrefix()}archive:`)) continue;
       const value = JSON.parse(localStorage.getItem(key)!) as InspectionDraft;
       if (value.assetId === assetId && value.taskId === taskId) drafts.push(value);
     }
@@ -172,7 +204,9 @@ export function loadArchivedDrafts(assetId: string, taskId?: string): Inspection
 
 export function clearInspectionDraft(assetId: string, taskId?: string): void {
   try {
-    window.localStorage.removeItem(`${DRAFT_PREFIX}${assetId}${taskId ? `:${taskId}` : ''}`);
+    window.localStorage.removeItem(
+      `${draftStoragePrefix()}${assetId}${taskId ? `:${taskId}` : ''}`,
+    );
   } catch {
     // ignore
   }
