@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 
 const origin = 'http://localhost:8788';
@@ -26,10 +26,15 @@ test('local D1 and R2 enforce invitation, roles, record concurrency and private 
     APP_ORIGIN: origin,
     BETTER_AUTH_SECRET: crypto.randomUUID() + crypto.randomUUID(),
   } as unknown as import('./common').PilotEnv;
-  const migration = await readFile(
-    new URL('../migrations/0001_pilot.sql', import.meta.url),
-    'utf8',
-  );
+  const dir = new URL('../migrations/', import.meta.url);
+  const migration = (
+    await Promise.all(
+      (await readdir(dir))
+        .filter((name) => name.endsWith('.sql'))
+        .sort()
+        .map((name) => readFile(new URL(name, dir), 'utf8')),
+    )
+  ).join('\n');
   const db = env.PILOT_DB;
   await db.batch(
     migration
@@ -296,7 +301,16 @@ test('local D1 and R2 enforce invitation, roles, record concurrency and private 
           dueDate: live.today,
         }),
       );
-      await ok(await change(operator, op.identity.memberId, 'start'));
+      const beforeStart = (await env.PILOT_FILES.list()).objects.map((object) => object.key);
+      await ok(
+        await change(operator, op.identity.memberId, 'start', {
+          photoDataUrl: 'data:image/jpeg;base64,/9j/4A==',
+        }),
+      );
+      assert.deepEqual(
+        (await env.PILOT_FILES.list()).objects.map((object) => object.key),
+        beforeStart,
+      );
       await ok(
         await change(operator, op.identity.memberId, 'submit', {
           note: 'Ajuste concluído',
@@ -395,22 +409,99 @@ test('local D1 and R2 enforce invitation, roles, record concurrency and private 
         ).invitation.role,
         'operator',
       );
-      const existing = await ok(
-        await api('/api/invitations', other, {
+      for (const email of ['OPERATOR@example.test', 'Pending@example.test']) {
+        const denied = await api('/api/invitations', other, {
           name: 'Convite',
-          email: 'operator@example.test',
+          email,
           role: 'admin',
-        }),
+        });
+        assert.equal(denied.status, 409);
+        assert.equal((await denied.json()).code, 'CONFLICT');
+      }
+      const pendingOwner = await provisionWorkspace(env, {
+        email: 'reserved@example.test',
+        name: 'Titular',
+        companyName: 'R',
+      });
+      assert.equal(
+        (
+          await api('/api/invitations', admin, {
+            name: 'Pessoa',
+            email: 'reserved@example.test',
+            role: 'viewer',
+          })
+        ).status,
+        409,
       );
-      const claim = {
-        token: new URL(existing.invitationUrl).hash.slice(1),
-        name: 'Convite',
+      const ownerCookie = await accept(pendingOwner.invitationUrl, 'Titular');
+      assert.equal((await workspace(ownerCookie)).identity.role, 'admin');
+      await assert.rejects(
+        provisionWorkspace(env, { email: info.email, name: 'Titular', companyName: 'R' }),
+      );
+      const pendingClaim = {
+        token: new URL(renewed.invitationUrl).hash.slice(1),
+        name: info.name,
         password,
       };
-      assert.equal((await api('/api/invitations/accept', '', claim)).status, 401);
-      assert.equal((await api('/api/invitations/accept', viewer, claim)).status, 403);
-      assert.equal((await api('/api/invitations/accept', operator, claim)).status, 409);
+      assert.equal((await api('/api/invitations/accept', viewer, pendingClaim)).status, 403);
       assert.equal((await workspace(operator)).identity.workspaceId, op.identity.workspaceId);
+    },
+  );
+
+  let historicDue = '';
+  await t.test(
+    'a previously scheduled daily plan materializes its rolling window on a new day',
+    async () => {
+      const earlier = new Date(live.today + 'T12:00:00Z');
+      earlier.setUTCDate(earlier.getUTCDate() - 180);
+      const plan = {
+        id: 'historical-plan',
+        name: 'Plano anterior',
+        assetIds: [asset.id],
+        templateId: template.id,
+        assigneeId: op.identity.memberId,
+        startDate: earlier.toISOString().slice(0, 10),
+        frequency: 'daily',
+        createdAt: earlier.toISOString(),
+      };
+      await db
+        .prepare("INSERT INTO pilot_entity(workspace,kind,id,data) VALUES(?,'plans',?,?)")
+        .bind(a.identity.workspaceId, plan.id, JSON.stringify(plan))
+        .run();
+      const past = new Date(earlier);
+      past.setUTCDate(past.getUTCDate() + 110);
+      const pastDay = past.toISOString().slice(0, 10);
+      historicDue = pastDay;
+      const corrupt = {
+        ...plan,
+        id: 'too-old',
+        startDate: '1900-01-01',
+        createdAt: '1900-01-01T12:00:00Z',
+      };
+      await db
+        .prepare("INSERT INTO pilot_entity(workspace,kind,id,data) VALUES(?,'plans',?,?)")
+        .bind(a.identity.workspaceId, corrupt.id, JSON.stringify(corrupt))
+        .run();
+      const capped = await api('/api/workspace', admin);
+      const ageFallback = await ok(capped);
+      assert.ok(ageFallback.scheduleWarning);
+      assert.ok(ageFallback.state.plans.some((p: any) => p.id === corrupt.id));
+      await db
+        .prepare("DELETE FROM pilot_entity WHERE workspace=? AND kind='plans' AND id=?")
+        .bind(a.identity.workspaceId, corrupt.id)
+        .run();
+      const reopened = await workspace(operator);
+      assert.ok(
+        reopened.state.tasks.some(
+          (task: any) =>
+            task.planId === plan.id && task.dueDate === pastDay && task.status === 'pending',
+        ),
+      );
+      assert.ok(
+        reopened.state.tasks.some(
+          (task: any) => task.planId === plan.id && task.dueDate === live.today,
+        ),
+      );
     },
   );
   await t.test(
@@ -439,6 +530,11 @@ test('local D1 and R2 enforce invitation, roles, record concurrency and private 
       const read = (path: string) =>
         handlePilot(new Request(origin + path, { headers: { cookie: admin } }), restored);
       const exportAgain = await ok(await read('/api/export'));
+      assert.ok(
+        exportAgain.workspace.state.tasks.some(
+          (task: any) => task.planId === 'historical-plan' && task.dueDate === historicDue,
+        ),
+      );
       assert.deepEqual(exportAgain.workspace, backup.workspace);
       assert.deepEqual(exportAgain.files, backup.files);
       const bytes = await (await read(photo)).arrayBuffer();
@@ -446,30 +542,168 @@ test('local D1 and R2 enforce invitation, roles, record concurrency and private 
     },
   );
   await t.test(
-    'a previously scheduled daily plan materializes its rolling window on a new day',
-    async () => {
-      const earlier = new Date(live.today + 'T12:00:00Z');
-      earlier.setUTCDate(earlier.getUTCDate() - 180);
-      const plan = {
-        id: 'historical-plan',
-        name: 'Plano anterior',
-        assetIds: [asset.id],
-        templateId: template.id,
-        assigneeId: op.identity.memberId,
-        startDate: earlier.toISOString().slice(0, 10),
-        frequency: 'daily',
-        createdAt: earlier.toISOString(),
+    'calendar growth limits scheduling while membership, equipment, records and export remain available',
+    async (context) => {
+      const time = Date.now();
+      context.mock.timers.enable({ apis: ['Date'], now: time });
+      const tenant = await workspace(other);
+      const assetDraft = {
+        ...draft,
+        siteId: tenant.state.sites[0].id,
+        assigneeId: tenant.identity.memberId,
+        templateId: tenant.state.templates[0].id,
       };
-      await db
-        .prepare("INSERT INTO pilot_entity(workspace,kind,id,data) VALUES(?,'plans',?,?)")
-        .bind(a.identity.workspaceId, plan.id, JSON.stringify(plan))
-        .run();
-      const reopened = await workspace(operator);
-      assert.ok(
-        reopened.state.tasks.some(
-          (task: any) => task.planId === plan.id && task.dueDate === live.today,
-        ),
+      const equipment = await ok(
+        await cmd(other, tenant.state.revision, {
+          type: 'asset.import',
+          drafts: Array.from({ length: 50 }, (_, i) => ({ ...assetDraft, code: 'CAP-' + i })),
+        }),
       );
+      const assetIds = equipment.state.assets.map((a: any) => a.id);
+      const plan = {
+        name: 'Diário',
+        assetIds,
+        templateId: assetDraft.templateId,
+        assigneeId: tenant.identity.memberId,
+        startDate: tenant.today,
+        frequency: 'daily',
+      };
+      const first = await ok(
+        await cmd(other, equipment.state.revision, { type: 'plan.save', draft: plan }),
+      );
+      assert.equal(
+        (await cmd(other, first.state.revision, { type: 'plan.save', draft: plan })).status,
+        422,
+      );
+      // Reopen schedules created before the one-year capacity reservation.
+      await db.batch(
+        Array.from({ length: 5 }, (_, i) => {
+          const old = { ...plan, id: 'legacy-' + i, createdAt: tenant.nowISO };
+          return db
+            .prepare("INSERT INTO pilot_entity(workspace,kind,id,data) VALUES(?,'plans',?,?)")
+            .bind(tenant.identity.workspaceId, old.id, JSON.stringify(old));
+        }),
+      );
+      const available = await workspace(other);
+      assert.equal(available.scheduleWarning, undefined);
+      assert.equal(available.state.tasks.length, 27300);
+      const inspection = () => ({
+        type: 'inspection.submit',
+        input: {
+          assetId: assetIds[0],
+          templateId: plan.templateId,
+          templateVersion: 1,
+          inspectorId: plan.assigneeId,
+          generalNotes: 'Operação',
+          idempotencyKey: crypto.randomUUID(),
+          answers: {
+            [tenant.state.templates[0].items[0].id]: { status: 'conforming', photoDataUrl: png },
+          },
+        },
+      });
+      const original = await ok(await cmd(other, first.state.revision, inspection()));
+      context.mock.timers.setTime(time + 10 * 86400000);
+      const login = await api('/api/auth/sign-in/email', '', {
+        email: 'other@example.test',
+        password,
+      });
+      await ok(login);
+      const renewed = login.headers.getSetCookie()[0].split(';')[0];
+      const live = await workspace(renewed);
+      assert.ok(live.scheduleWarning);
+      assert.equal(live.state.plans.length, 6);
+      assert.equal(live.state.assets.length, 50);
+      assert.equal(live.state.tasks.length, 4550);
+      assert.equal(live.state.records[0].id, original.result.record.id);
+      assert.ok((await ok(await api('/api/session', renewed))).scheduleWarning);
+      const exported = await ok(await api('/api/export', renewed));
+      assert.equal(exported.scheduleWarning, live.scheduleWarning);
+      assert.equal(exported.files.length, 1);
+      assert.equal((await api(exported.files[0], renewed)).status, 200);
+      const saved = await ok(await cmd(renewed, live.state.revision, inspection()));
+      assert.equal(saved.state.records.length, 2);
+      assert.ok(saved.scheduleWarning);
+      assert.equal(
+        (await cmd(renewed, saved.state.revision, { type: 'plan.save', draft: plan })).status,
+        422,
+      );
+    },
+  );
+  await t.test(
+    'numeric snapshots omit hidden values and only included photos enter storage and export',
+    async () => {
+      const fresh = await workspace(admin);
+      const numeric = {
+        ...template,
+        id: 'measurement',
+        version: 0,
+        items: [
+          { ...template.items[0], id: 'temp', type: 'number', min: 5, max: 20 },
+          {
+            ...template.items[0],
+            id: 'extra',
+            visibleWhen: { itemId: 'temp', equals: 'non_conforming' },
+          },
+        ],
+      };
+      const published = await ok(
+        await cmd(admin, fresh.state.revision, { type: 'template.publish', template: numeric }),
+      );
+      const newAsset = await ok(
+        await cmd(admin, published.state.revision, {
+          type: 'asset.create',
+          draft: { ...draft, code: 'EQ-MEASURE', templateId: numeric.id },
+        }),
+      );
+      const note = '/api/files/' + '1'.repeat(64);
+      const inventory = async () => (await env.PILOT_FILES.list()).objects.map((o) => o.key).sort();
+      const before = await inventory();
+      const inspect = (answers: any) =>
+        cmd(
+          operator,
+          newAsset.state.revision,
+          submit({
+            assetId: newAsset.result.asset.id,
+            templateId: numeric.id,
+            templateVersion: 1,
+            answers,
+            generalNotes: note,
+            idempotencyKey: crypto.randomUUID(),
+          }),
+        );
+      const hiddenPhoto = 'data:image/jpeg;base64,/9j/4A==';
+      const na = await ok(
+        await inspect({
+          temp: { status: 'na', numericValue: '35' },
+          extra: { status: 'conforming', photoDataUrl: hiddenPhoto },
+        }),
+      );
+      assert.equal(na.result.record.answers.length, 1);
+      assert.equal(na.result.record.answers[0].numericValue, undefined);
+      assert.deepEqual(await inventory(), before);
+      const failed = await ok(
+        await inspect({
+          temp: { status: 'conforming', numericValue: '35', note: 'Acima do limite' },
+          extra: { status: 'conforming' },
+        }),
+      );
+      assert.equal(failed.result.record.answers[0].status, 'non_conforming');
+      assert.equal(failed.result.record.answers[0].numericValue, '35');
+      assert.deepEqual((await ok(await api('/api/export', admin))).files, [photo]);
+      await db
+        .prepare(
+          "UPDATE pilot_entity SET data=json_set(data,'$.lastInspectionAt',?) WHERE workspace=? AND kind='assets' AND id=?",
+        )
+        .bind('2026-11-20T01:30:00Z', a.identity.workspaceId, newAsset.result.asset.id)
+        .run();
+      const changed = await ok(
+        await cmd(admin, failed.state.revision, {
+          type: 'asset.update',
+          assetId: newAsset.result.asset.id,
+          patch: { inspectionCycleDays: 2 },
+        }),
+      );
+      assert.equal(changed.result.asset.nextInspectionDue, '2026-11-21');
     },
   );
   const edit = await ok(
@@ -478,7 +712,10 @@ test('local D1 and R2 enforce invitation, roles, record concurrency and private 
       template: { ...template, name: 'Modelo novo' },
     }),
   );
-  assert.equal(edit.state.records[0].templateNameSnapshot, template.name);
+  assert.equal(
+    edit.state.records.find((r: any) => r.id === record.id).templateNameSnapshot,
+    template.name,
+  );
   assert.equal(
     (await cmd(operator, edit.state.revision, submit({ idempotencyKey: crypto.randomUUID() })))
       .status,
@@ -504,7 +741,22 @@ test('local D1 and R2 enforce invitation, roles, record concurrency and private 
   assert.equal((await api('/api/session', operator)).status, 403);
   assert.equal((await api(photo, operator)).status, 403);
   assert.equal((await api('/api/auth/get-session', operator)).status, 403);
-  await ok(await api('/api/auth/sign-out', viewer, {}));
+  await t.test(
+    'logout clears the cookie and the stored session when login is throttled',
+    async (context) => {
+      context.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+      for (let i = 0; i < 25; i++) {
+        const login = await api('/api/auth/sign-in/email', '', {});
+        if (login.status === 429) break;
+        assert.equal(login.status, 400);
+      }
+      assert.equal((await api('/api/auth/sign-in/email', '', {})).status, 429);
+      const logout = await api('/api/auth/sign-out', viewer, {});
+      await ok(logout);
+      assert.match(logout.headers.get('set-cookie') ?? '', /Max-Age=0/i);
+      assert.equal((await api('/api/session', viewer)).status, 401);
+    },
+  );
   assert.equal((await api('/api/session', viewer)).status, 401);
   await t.test(
     'a second administrator can keep the workspace running when the first disables their own account',
@@ -529,7 +781,8 @@ test('local D1 and R2 enforce invitation, roles, record concurrency and private 
   );
   await t.test(
     'invitation attempts share an atomic, persistent rate limit across requests',
-    async () => {
+    async (context) => {
+      context.mock.timers.enable({ apis: ['Date'], now: Date.now() });
       const token = '0'.repeat(64);
       let limited = false;
       for (let i = 0; i <= 30; i++) {

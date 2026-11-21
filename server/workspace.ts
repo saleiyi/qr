@@ -1,8 +1,9 @@
 import type { AppStateData, Member } from '../src/types/domain';
-import { materializePlanTasks } from '../src/utils/operations';
+import { projectSchedule } from './schedule';
 import type { PilotIdentity, PilotWorkspaceResponse } from '../src/types/pilot';
 import { authFor } from './auth';
 import { clock, Failure, guard, missing, unauthenticated, type PilotEnv } from './common';
+
 function inactive(): never {
   throw new Failure(
     403,
@@ -95,16 +96,13 @@ export async function workspace(
       (state[kind] as { id: string }[]).push(JSON.parse(String(entity.data)));
   }
   const currentClock = clock(String(row.timezone));
-  const stored = new Set(state.tasks.map((task) => task.id));
-  for (const plan of state.plans) {
-    for (const task of materializePlanTasks(plan, currentClock.today)) {
-      if (!stored.has(task.id)) state.tasks.push(task);
-    }
-  }
+  const scheduleWarning = projectSchedule(state, currentClock.today, currentClock.timezone);
+  if (scheduleWarning) state.scheduleWarnings = [scheduleWarning];
   return {
     ok: true,
     identity: { ...identity, role: member.role, name: member.name, email: member.email },
     state,
     ...currentClock,
+    ...(scheduleWarning ? { scheduleWarning } : {}),
   };
 }

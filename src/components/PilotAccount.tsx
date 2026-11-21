@@ -70,6 +70,14 @@ export function PilotSyncBar() {
         <RefreshCw className={`h-4 w-4 ${pilot.refreshing ? 'animate-spin' : ''}`} />
         Atualizar registros
       </button>
+      {pilot.data.scheduleWarning && (
+        <p
+          role="alert"
+          className="w-full rounded-lg border border-[#F2D3AA] bg-[#FEF6EB] px-3 py-2 text-sm leading-relaxed text-[#8A4B0F]"
+        >
+          {pilot.data.scheduleWarning}
+        </p>
+      )}
     </div>
   );
 }

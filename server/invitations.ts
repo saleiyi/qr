@@ -61,7 +61,8 @@ export async function createInvitation(env: PilotEnv, actor: PilotIdentity, body
     .prepare('SELECT id,userId FROM pilot_member WHERE workspace=? AND email=?')
     .bind(actor.workspaceId, email)
     .first<{ id: string; userId: string | null }>();
-  if (member?.userId) conflict('Esta pessoa já possui acesso cadastrado.');
+  const unavailable = 'Não foi possível emitir o convite para este endereço.';
+  if (member?.userId) conflict(unavailable);
   const id = member?.id ?? crypto.randomUUID();
   const key = await invitationKey(env.APP_ORIGIN);
   try {
@@ -90,7 +91,7 @@ export async function createInvitation(env: PilotEnv, actor: PilotIdentity, body
         .bind(crypto.randomUUID(), actor.workspaceId),
     ]);
   } catch (e) {
-    if (isGuardFailure(e) || /constraint/i.test(String(e))) conflict();
+    if (isGuardFailure(e) || /constraint/i.test(String(e))) conflict(unavailable);
     throw e;
   }
   return json({

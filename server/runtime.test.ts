@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import { prepareWorkspaceProvision } from './provision';
@@ -40,10 +40,15 @@ test('workerd can activate an owner, set a secure cookie, and authenticate a sec
   );
   t.after(() => mf.dispose());
   const db = await mf.getD1Database('PILOT_DB');
-  const migration = await readFile(
-    new URL('../migrations/0001_pilot.sql', import.meta.url),
-    'utf8',
-  );
+  const dir = new URL('../migrations/', import.meta.url);
+  const migration = (
+    await Promise.all(
+      (await readdir(dir))
+        .filter((name) => name.endsWith('.sql'))
+        .sort()
+        .map((name) => readFile(new URL(name, dir), 'utf8')),
+    )
+  ).join('\n');
   await db.batch(
     migration
       .split(';')

@@ -1,4 +1,13 @@
-import type { AppStateData, Asset, ChecklistTemplate, CompanyProfile, InspectionPlan, IssuePriority, Member, UserRole } from './domain';
+import type {
+  AppStateData,
+  Asset,
+  ChecklistTemplate,
+  CompanyProfile,
+  InspectionPlan,
+  IssuePriority,
+  Member,
+  UserRole,
+} from './domain';
 import type { InspectionSubmissionInput } from '../context/inspectionAction';
 import type { WorkOrderAction, WorkOrderChange } from '../utils/operations';
 
@@ -19,6 +28,7 @@ export interface PilotWorkspaceResponse extends PilotClock {
   ok: true;
   identity: PilotIdentity;
   state: AppStateData;
+  scheduleWarning?: string;
 }
 export interface PilotFailure {
   ok: false;
@@ -32,7 +42,17 @@ export type PilotCommand =
   | { type: 'asset.import'; drafts: AssetDraft[] }
   | { type: 'asset.status'; assetId: string; status: 'active' | 'inactive' }
   | { type: 'inspection.submit'; input: InspectionSubmissionInput }
-  | { type: 'request.create'; assetId: string; draft: { title: string; description: string; priority: IssuePriority; reportedBy?: string; photoDataUrl?: string } }
+  | {
+      type: 'request.create';
+      assetId: string;
+      draft: {
+        title: string;
+        description: string;
+        priority: IssuePriority;
+        reportedBy?: string;
+        photoDataUrl?: string;
+      };
+    }
   | { type: 'issue.change'; issueId: string; action: WorkOrderAction; change: WorkOrderChange }
   | { type: 'plan.save'; draft: Omit<InspectionPlan, 'id' | 'createdAt'> }
   | { type: 'template.draft'; template: ChecklistTemplate }
@@ -56,7 +76,10 @@ export interface PilotInvitation {
   expiresAt: string;
   existingAccount: boolean;
 }
-export interface PilotInvitationResponse { ok: true; invitation: PilotInvitation }
+export interface PilotInvitationResponse {
+  ok: true;
+  invitation: PilotInvitation;
+}
 export interface PilotInviteCreated {
   ok: true;
   invitationUrl: string;

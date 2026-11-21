@@ -111,6 +111,14 @@ export const MobileScanPage: React.FC = () => {
           </div>
         )}
 
+        {isPilot && state.scheduleWarnings?.length ? (
+          <p
+            role="alert"
+            className="mb-4 rounded-xl border border-[#F2D3AA] bg-[#FEF6EB] p-4 text-sm leading-relaxed text-[#8A4B0F]"
+          >
+            {state.scheduleWarnings.join(' ')}
+          </p>
+        ) : null}
         {isPilot && (
           <p className="mb-4 text-sm text-[#526980]">{identity?.name} · Acesso da sua empresa</p>
         )}
@@ -261,7 +269,9 @@ export const MobileScanPage: React.FC = () => {
                           <strong>{task.planName}</strong>
                           <span className="mt-1 block text-[#526980]">
                             {formatDateBR(task.dueDate)} ·{' '}
-                            {isViewer || (isPilot && task.assigneeId !== identity?.memberId) ? 'Consultar na agenda' : 'Abrir inspeção'}
+                            {isViewer || (isPilot && task.assigneeId !== identity?.memberId)
+                              ? 'Consultar na agenda'
+                              : 'Abrir inspeção'}
                           </span>
                         </Link>
                       ))}
@@ -278,7 +288,9 @@ export const MobileScanPage: React.FC = () => {
                     <div className="flex items-center gap-2 rounded-xl border border-[#DCE4EC] bg-[#F4F7FA] px-4 py-3 text-xs text-[#476078]">
                       <Eye className="h-4 w-4 shrink-0" aria-hidden="true" />
                       <span>
-                        {isPilot ? 'Seu perfil permite consultar a ficha e o histórico. Solicite acesso de operador ao administrador para inspecionar.' : 'Perfil Visualizador: apenas leitura de ficha e histórico. Alterne para Operador ou Admin para inspecionar.'}
+                        {isPilot
+                          ? 'Seu perfil permite consultar a ficha e o histórico. Solicite acesso de operador ao administrador para inspecionar.'
+                          : 'Perfil Visualizador: apenas leitura de ficha e histórico. Alterne para Operador ou Admin para inspecionar.'}
                       </span>
                     </div>
                   ) : isInactive ? (

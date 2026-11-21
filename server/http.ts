@@ -3,7 +3,7 @@ import { authFor } from './auth';
 import { authenticate, membershipFor, workspace } from './workspace';
 import { createInvitation, preview, accept } from './invitations';
 import { runCommand } from './transaction';
-import { readFile } from './files';
+import { attachmentManifest, readFile } from './files';
 import {
   denied,
   Failure,
@@ -36,7 +36,7 @@ async function authRoute(env: PilotEnv, request: Request, path: string) {
       session: { expiresAt: session.session.expiresAt },
     });
   }
-  await rateLimit(env, request, 'auth', 12);
+  if (!path.endsWith('/sign-out')) await rateLimit(env, request, 'auth', 12);
   const body = await readJson(request, 4096);
   let response: Response;
   if (path.endsWith('/sign-in/email')) {
@@ -127,18 +127,15 @@ async function route(request: Request, env: PilotEnv) {
     if (identity.role !== 'admin') denied();
     const live = await workspace(env, identity);
     if (live.identity.role !== 'admin') denied();
-    const files = new Set<string>();
-    JSON.stringify(live.state, (_k, v) => {
-      if (typeof v === 'string' && /^\/api\/files\/[a-f0-9]{64}$/.test(v)) files.add(v);
-      return v;
-    });
+    const files = attachmentManifest(live.state);
     return json(
       {
         ok: true,
         format: 'tagronda.workspace.v1',
         exportedAt: live.nowISO,
+        ...(live.scheduleWarning ? { scheduleWarning: live.scheduleWarning } : {}),
         workspace: { id: identity.workspaceId, timezone: live.timezone, state: live.state },
-        files: [...files].sort(),
+        files,
       },
       200,
       new Headers({ 'content-disposition': 'attachment; filename="tagronda-workspace.json"' }),

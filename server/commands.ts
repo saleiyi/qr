@@ -8,9 +8,10 @@ import {
 import { visibleItems, validateTemplate } from '../src/utils/checklist';
 import { validDate, materializePlanTasks, transitionWorkOrder } from '../src/utils/operations';
 import { addDaysISODate } from '../src/utils/date';
-import { denied, invalid, missing, conflict } from './common';
+import { calendarDay, denied, invalid, missing, conflict } from './common';
 import { Files } from './files';
-import { type EntityKind } from './workspace';
+import type { EntityKind } from './workspace';
+import { admitPlan } from './schedule';
 
 export interface Mutation {
   put: Partial<Record<EntityKind, { id: string }[]>>;
@@ -88,7 +89,7 @@ export async function applyCommand(
           existing.inspectionCycleDays !== asset.inspectionCycleDays
         )
           asset.nextInspectionDue = addDaysISODate(
-            existing.lastInspectionAt,
+            calendarDay(existing.lastInspectionAt, live.timezone),
             asset.inspectionCycleDays,
           );
         assets.push(asset);
@@ -127,15 +128,20 @@ export async function applyCommand(
         p.templateVersion !== (template.version ?? 1)
       )
         conflict('O modelo foi atualizado. Reabra a inspeção.');
-      const answers = structuredClone(p.answers);
-      for (const [key, a] of Object.entries(answers)) {
-        if (!template.items.some((q) => q.id === key)) invalid('Pergunta desconhecida.');
-        if (a.photoDataUrl) a.photoDataUrl = await files.resolve(a.photoDataUrl);
-      }
-      for (const item of visibleItems(template, answers)) {
-        const a = answers[item.id];
-        if (item.type === 'date' && a?.value && !validDate(a.value))
+      const questionIds = new Set(template.items.map((q) => q.id));
+      for (const key of Object.keys(p.answers))
+        if (!questionIds.has(key)) invalid('Pergunta desconhecida.');
+      const answers: typeof p.answers = {};
+      for (const item of visibleItems(template, p.answers)) {
+        const raw = p.answers[item.id];
+        if (!raw) continue;
+        const answer = { ...raw };
+        if (item.type !== 'number' || answer.status === 'na') delete answer.numericValue;
+        if (item.type !== 'date' && item.type !== 'single_choice') delete answer.value;
+        if (item.type === 'date' && answer.value && !validDate(answer.value))
           invalid('Informe uma data válida.');
+        if (answer.photoDataUrl) answer.photoDataUrl = await files.resolve(answer.photoDataUrl);
+        answers[item.id] = answer;
       }
       const errors = validateInspectionDraft(template, answers);
       if (errors.length) invalid(errors[0].message);
@@ -200,7 +206,8 @@ export async function applyCommand(
       };
       if (cmd.action === 'assign')
         change.assigneeName = technician(state, change.assigneeId ?? '').name;
-      if (change.photoDataUrl) change.photoDataUrl = await files.resolve(change.photoDataUrl);
+      if (cmd.action === 'submit' && change.photoDataUrl)
+        change.photoDataUrl = await files.resolve(change.photoDataUrl);
       try {
         const updated = transitionWorkOrder(issue, cmd.action, change, nowISO);
         data.put.issues = [updated];
@@ -218,11 +225,13 @@ export async function applyCommand(
       if (p.startDate > addDaysISODate(today, 90))
         invalid('Escolha uma data inicial dentro de 90 dias.');
       const plan = { ...p, id: 'plan-' + crypto.randomUUID(), createdAt: nowISO };
+      admitPlan(state, plan, today, live.timezone);
       try {
         data.put.tasks = materializePlanTasks(plan, today, []);
       } catch (e) {
         invalid((e as Error).message);
       }
+
       data.put.plans = [plan];
       data.result = { plan };
       break;

@@ -30,7 +30,8 @@ type PlanDraft = Omit<InspectionPlan, 'id' | 'createdAt'>;
 export function PlansPage() {
   const { effectiveState: state, demoSettings, savePlan, isPilot, identity } = useAppState();
   const today = APP_CONFIG.demoClockDate;
-  const canPlan = demoSettings.activeDemoRole === 'admin';
+  const canPlan =
+    demoSettings.activeDemoRole === 'admin' && (!isPilot || !state.scheduleWarnings?.length);
   const [period, setPeriod] = useState('today');
   const [assignee, setAssignee] = useState('all');
   const [view, setView] = useState<'list' | 'calendar'>('list');
@@ -165,7 +166,7 @@ export function PlansPage() {
           </button>
         ))}
       </div>
-      <FormError message={state.scheduleWarnings?.join(' ')} />
+      <FormError message={!isPilot ? state.scheduleWarnings?.join(' ') : undefined} />
       <section className="mt-6 overflow-hidden rounded-xl border border-[#DCE4EC] bg-white">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#DCE4EC] p-4">
           <div className="flex flex-wrap items-center gap-2">

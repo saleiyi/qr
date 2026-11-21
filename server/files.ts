@@ -1,5 +1,24 @@
+import type { AppStateData } from '../src/types/domain';
 import { digest, invalid, missing, type PilotEnv } from './common';
 const filePattern = /^\/api\/files\/([a-f0-9]{64})$/;
+export function attachmentManifest(state: AppStateData): string[] {
+  const files = new Set<string>();
+  function include(path?: string) {
+    if (path && filePattern.test(path)) files.add(path);
+  }
+  for (const asset of state.assets) {
+    include(asset.photoDataUrl);
+    for (const file of asset.files) include(file.dataUrl);
+  }
+  for (const record of state.records)
+    for (const answer of record.answers) include(answer.photoDataUrl);
+  for (const issue of state.issues) {
+    include(issue.photoDataUrl);
+    include(issue.treatmentPhotoDataUrl);
+    for (const event of issue.timeline ?? []) include(event.photoDataUrl);
+  }
+  return [...files].sort();
+}
 const limit = 5 * 1024 * 1024;
 function imageType(b: Uint8Array) {
   if (

@@ -60,15 +60,17 @@ export function guard(db: D1Database, condition: string, ...values: unknown[]) {
 export function isGuardFailure(e: unknown) {
   return String(e).includes('pilot_cas');
 }
-export function clock(timezone: string) {
-  const now = new Date();
-  const today = new Intl.DateTimeFormat('en-CA', {
+export function calendarDay(instant: Date | string, timezone: string) {
+  return new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(now);
-  return { nowISO: now.toISOString(), today, timezone };
+  }).format(new Date(instant));
+}
+export function clock(timezone: string) {
+  const now = new Date();
+  return { nowISO: now.toISOString(), today: calendarDay(now, timezone), timezone };
 }
 export async function readJson(request: Request, max: number) {
   if (

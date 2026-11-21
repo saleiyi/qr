@@ -11,7 +11,7 @@ if (!inputPath)
 const privateRoot = resolve('.pilot-private');
 const output = resolve(outputPath);
 if (!output.startsWith(privateRoot + sep)) throw new Error('Output must be inside .pilot-private/');
-const input = JSON.parse(await readFile(inputPath, 'utf8'));
+const input = JSON.parse((await readFile(inputPath, 'utf8')).replace(/^\uFEFF/, ''));
 const result = await prepareWorkspaceProvision(input);
 await mkdir(output, { recursive: true });
 await writeFile(resolve(output, 'provision.sql'), result.sql, { flag: 'wx' });

@@ -89,3 +89,11 @@ Backups and restore rehearsals are manual in this pilot. Before broader rollout,
 add scheduled encrypted backups, uptime/error alerts, retention rules and a
 documented support/recovery process. Reassess aggregate snapshot reads and storage
 limits as usage grows. A new paid plan requires explicit authorization.
+
+Recurring plans have a projection budget, with one year of admission headroom.
+If an older/imported schedule exceeds the budget, the app explicitly marks the
+agenda as requiring maintenance and refuses new plans. Saved records, equipment,
+ordinary QR inspections and admin export remain available. The export retains
+the durable plans and stored task history and includes the same warning; it must
+not be interpreted as a complete projected agenda while that warning is present.
+Contact the operator to rebalance the schedule before extending the trial.
