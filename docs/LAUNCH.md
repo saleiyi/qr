@@ -11,8 +11,27 @@ Date: 2026-11-21 (Asia/Taipei).
   a live quote, not a completed purchase or reservation.
 - Public exact-name software searches found no obvious Tagronda product.
 - RondaQR was rejected because an existing Brazilian QR application uses it.
-- Domain registration: **pending exact-domain and purchase confirmation**.
-- Custom-domain DNS and HTTPS: **not configured**.
+- Domain registration: **the user will purchase manually**. Do not register or
+  charge the account from this task; this supersedes the earlier purchase approval.
+- Custom-domain DNS: **configured and read back**, awaiting registrar delegation.
+- Custom-domain HTTPS: **pending**, not yet verified.
+
+## Cloudflare DNS preparation
+
+- Zone: `66d5464a4df166f53757fc0682f7c505`, Free Website (USD 0).
+- Zone status at preparation: `pending`.
+- Nameservers to enter at the registrar:
+  - `arch.ns.cloudflare.com`
+  - `joyce.ns.cloudflare.com`
+- Proxied CNAME, TTL Auto: `tagronda.com` -> `tagronda.pages.dev`.
+- Proxied CNAME, TTL Auto: `www.tagronda.com` -> `tagronda.pages.dev`.
+- Both hostnames are associated with the existing Tagronda Pages project.
+  Domain/certificate verification is pending until registration and authoritative
+  nameserver delegation are visible. A pending verification message does not mean
+  that the newly written zone records are missing.
+- Once the user finishes registration, re-read public NS and zone status before
+  any activation request. Then verify both hostnames and HTTPS, and add canonical
+  metadata/sitemap for the working primary domain.
 
 ## Hosting
 

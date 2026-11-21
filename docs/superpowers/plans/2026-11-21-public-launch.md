@@ -44,5 +44,8 @@ account. Keep demo storage browser-local and retain the current app routes.
 ### Task 3: Complete the domain handoff
 
 - [x] Present the exact live domain quote and renewal terms for confirmation.
-- [ ] After purchase authorization, recheck availability and register one year.
-- [ ] Bind the domain, verify DNS/TLS, add canonical metadata/sitemap and redeploy.
+- [x] User chose manual purchase; prepare the free zone and provide its two NS.
+      Do not execute the earlier authorized purchase; it has been superseded.
+- [x] Associate apex/www with Pages and write/read back both proxied CNAME records.
+- [ ] After the user completes purchase/delegation, verify public NS and TLS,
+      add canonical metadata/sitemap and redeploy.
