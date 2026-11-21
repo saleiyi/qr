@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ChevronDown, Plus, RotateCcw, Save } from 'lucide-react';
 import { useAppState } from '../context/AppStateContext';
 import { AppShell } from '../components/AppShell';
@@ -23,6 +23,15 @@ export const SettingsPage: React.FC = () => {
   const [cnpj, setCnpj] = useState(state.company.cnpj);
   const [city, setCity] = useState(state.company.city);
   const [contactEmail, setContactEmail] = useState(state.company.contactEmail);
+  const [companyDirty, setCompanyDirty] = useState(false);
+  useEffect(() => {
+    if (companyDirty) return;
+    setCompanyName(state.company.name);
+    setTradeName(state.company.tradeName);
+    setCnpj(state.company.cnpj);
+    setCity(state.company.city);
+    setContactEmail(state.company.contactEmail);
+  }, [state.company, companyDirty]);
 
   const [newName, setNewName] = useState('');
   const [newJobTitle, setNewJobTitle] = useState('');
@@ -41,13 +50,14 @@ export const SettingsPage: React.FC = () => {
 
   const handleSaveCompany = async (e: React.FormEvent) => {
     e.preventDefault();
-    await updateCompany({
+    const result = await updateCompany({
       name: companyName.trim() || state.company.name,
       tradeName: tradeName.trim() || state.company.tradeName,
       cnpj: cnpj.trim(),
       city: city.trim(),
       contactEmail: contactEmail.trim(),
     });
+    if (result.ok) setCompanyDirty(false);
   };
 
   const handleAddMember = async (e: React.FormEvent) => {
@@ -144,6 +154,7 @@ export const SettingsPage: React.FC = () => {
 
           <form
             onSubmit={handleSaveCompany}
+            onChange={() => setCompanyDirty(true)}
             data-cloud-command="company.update"
             className="mt-4 space-y-4"
           >

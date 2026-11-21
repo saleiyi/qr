@@ -24,6 +24,7 @@ interface PilotContextValue {
   execute: (command: PilotCommand, revision?: string) => Promise<PilotCommandResponse>;
   logout: () => Promise<void>;
   completeEditing: (command?: string) => void;
+  beginEditing: (element: HTMLElement) => void;
 }
 const PilotContext = createContext<PilotContextValue | null>(null);
 
@@ -34,7 +35,7 @@ export function PilotProvider({ children }: { children: ReactNode }) {
   const [refreshing, setRefreshing] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
   const [editing, setEditing] = useState(false);
-  const editingForm = useRef<HTMLFormElement | null>(null);
+  const editingForm = useRef<HTMLElement | null>(null);
   const editRevision = useRef<string | undefined>(undefined);
   const dataRef = useRef<PilotWorkspaceResponse | null>(null);
   const mounted = useRef(true);
@@ -89,13 +90,20 @@ export function PilotProvider({ children }: { children: ReactNode }) {
       !editingForm.current?.isConnected ||
       !formCommand ||
       !command ||
-      command === formCommand ||
-      command.startsWith(`${formCommand}.`)
+      formCommand.split(' ').some((name) => command === name || command.startsWith(`${name}.`))
     ) {
       editingForm.current = null;
       editRevision.current = undefined;
       setEditing(false);
     }
+  }, []);
+
+  const beginEditing = useCallback((element: HTMLElement) => {
+    if (editingForm.current?.isConnected) return;
+    editingForm.current = element;
+    generation.current += 1;
+    editRevision.current = dataRef.current?.state.revision;
+    setEditing(true);
   }, []);
 
   useEffect(() => {
@@ -147,12 +155,11 @@ export function PilotProvider({ children }: { children: ReactNode }) {
     const timer = window.setInterval(refreshWhenIdle, 15_000);
     const markEditing = (event: Event) => {
       const target = event.target;
-      const form = target instanceof HTMLElement ? target.closest('form') : null;
-      if (!form || editingForm.current?.isConnected) return;
-      editingForm.current = form;
-      generation.current += 1;
-      editRevision.current = dataRef.current?.state.revision;
-      setEditing(true);
+      const form =
+        target instanceof HTMLElement
+          ? target.closest<HTMLElement>('form, [data-cloud-editor]')
+          : null;
+      if (form) beginEditing(form);
     };
     document.addEventListener('input', markEditing);
     document.addEventListener('change', markEditing);
@@ -165,7 +172,7 @@ export function PilotProvider({ children }: { children: ReactNode }) {
       document.removeEventListener('change', markEditing);
       configurePilotClock(null);
     };
-  }, [refresh]);
+  }, [refresh, beginEditing]);
 
   const execute = useCallback(
     async (command: PilotCommand, revision?: string) => {
@@ -214,6 +221,7 @@ export function PilotProvider({ children }: { children: ReactNode }) {
         execute,
         logout,
         completeEditing,
+        beginEditing,
       }}
     >
       {children}

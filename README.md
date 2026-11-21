@@ -1,11 +1,13 @@
-# Tagronda frontend demonstration
+# Tagronda
 
-Portuguese equipment records, QR labels, inspections, issue treatment, and
-printable reports. This is a frontend prototype: application data and inspection
-drafts stay in the current browser's local storage. It does not provide backend
-accounts, payments, or synchronization between devices.
+Portuguese equipment records, QR labels, inspections, issue treatment and reports.
+The invite-only pilot connects the React frontend to Cloudflare Pages Functions,
+Better Auth, D1 and private R2. Real workspaces use authenticated accounts and
+server permissions; equipment and inspection records synchronize between devices.
 
-Public demo: [tagronda.com](https://tagronda.com). The `www` hostname redirects to
+Website: [tagronda.com](https://tagronda.com). Sign in at `/login`; the explicit
+public demo is `/demo/app` and stores its examples only in the current browser.
+The `www` hostname redirects to
 the primary HTTPS domain while preserving equipment links and query parameters.
 
 ## Development
@@ -17,7 +19,10 @@ bun install --frozen-lockfile
 bun run dev
 ```
 
-Open the local URL printed by Vite. The equipment scan pages use `/a/:id`; a
+Vite development mode opens the local demonstration. To test real accounts, build
+the app and run `wrangler pages dev dist --port 8788` with local D1 migrations,
+private R2 bindings and an ignored `.dev.vars` based on `.dev.vars.example`.
+The equipment scan pages use `/a/:id`; a
 phone needs a reachable preview URL to open a QR link generated on another device.
 
 ## Verification
@@ -25,15 +30,22 @@ phone needs a reachable preview URL to open a QR link generated on another devic
 ```sh
 bun run lint
 bun run test
+bun run test:backend
 bun run build
 bunx playwright install chromium
 bun run test:e2e
 ```
 
-The browser suite starts Vite on `127.0.0.1:4173`. To use an installed Chrome
+The demo browser suite starts Vite on `127.0.0.1:4174`. To use an installed Chrome
 instead of Playwright Chromium, set `PLAYWRIGHT_CHANNEL=chrome` in the environment.
 Screenshots, failure traces, and an example complete report PDF are written under
 `test-results/` and are not committed.
+
+`bun run test:pilot` runs the production-bundle desktop/phone acceptance flow.
+It needs disposable provisioned workspaces and an ignored fixture selected by
+`PILOT_TEST_FIXTURE`; set `PILOT_TEST_ORIGIN` for an isolated cloud preview.
+Pilot screenshots and traces stay in the ignored `.superpowers/pilot-test-results/`.
+Never point acceptance seeding at a real customer's workspace.
 
 Browser tests cover reports exceeding 20 records, inspection evidence, failed
 draft persistence and retry, navigation/unload protection, nested modal keyboard
@@ -42,22 +54,28 @@ mobile menu resizing, submission/issue treatment, and 375px/768px/1440px layouts
 
 ## Preview hosting
 
-`bun run build` produces `dist/`. Static hosting must serve `index.html` as the
+`bun run build` produces `dist/`. Hosting must serve `index.html` as the
 fallback for application paths such as `/app/assets/eq-001` and `/a/eq-001`.
 
-The Cloudflare Pages project is `tagronda`. Its native SPA fallback serves these
+The Cloudflare Pages project is `tagronda`, with `/api/*` served by Pages Functions.
+Its native SPA fallback serves application
 routes; do not add a root `404.html` without replacing that fallback. Deploy the
 built directory using `wrangler pages deploy dist --project-name tagronda
 --branch main` with credentials supplied through the environment. No credentials
 belong in this repository. See [the launch record](docs/LAUNCH.md) for domain and
-deployment status.
+deployment status. See [pilot operations](docs/pilot-operations.md) for private owner
+provisioning, preview/production bindings, migrations, backup/restore and trial limits.
 
-Drafts and demo data are browser-local. Use the reset action in Settings to return
+Demo data and local drafts are browser-local. Use the demo reset in Settings to return
 to the initial examples. Failed saves preserve current input and display a retry
 action; the browser warns before leaving with unsaved inspection input.
 While a photo is being processed, saving and submission wait for the attachment.
 
 ## Inspection operations
+
+The behaviors below are also available in the demonstration. Its browser locking,
+role simulator and local persistence are specific to the demo. Live workspaces use
+server commands, authenticated actors, database revisions and workspace isolation.
 
 - `/app/plans`: daily, weekly or monthly plans for selected equipment, a published
   checklist and an inspector. Agenda and calendar show linked task executions.
@@ -89,6 +107,7 @@ answers; prior drafts are archived before replacement and can be downloaded with
 their photos. Treatment events retain each submission's evidence and assignment
 events retain their technician, deadline and priority.
 
-The profile switch demonstrates administrator/operator/viewer interfaces within
+The demo profile switch demonstrates administrator/operator/viewer interfaces within
 the current app session. It provides no real authentication or access security.
-These operations do not send emails or WhatsApp messages or synchronize devices.
+The demo does not synchronize devices. Neither mode sends email or WhatsApp messages;
+live invitations are shared manually by the administrator.
